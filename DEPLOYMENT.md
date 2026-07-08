@@ -57,6 +57,21 @@ admin console:
 
 Without these, the login redirect and the silent-SSO check are rejected by Keycloak.
 
+### 2a. Local dev: the IdP realm must allow these origins too
+
+The `museotek-box-web` client's origin allowlist is per-origin, not per-app — each local port you
+serve this SPA from needs its own entry, same as the staging URL above. Currently in the
+production realm:
+
+- `http://localhost:5173/*` (Vite dev server, `npm run dev`) — **registered, confirmed working**
+- `http://localhost:8083/*` (Docker Compose default, `FRONTEND_PORT=8083`) — **not yet registered**;
+  add it (and the matching web origin `http://localhost:8083`) only if you need to test login via
+  the containerised build rather than `npm run dev`
+
+This is exactly what "Invalid parameter: redirect_uri" means if you hit it locally: the origin
+you're serving from isn't in the client's allowlist yet. Add both the redirect URI and the web
+origin for whichever port you're using, via the same IdP admin console flow as §2.
+
 ---
 
 ## 3. nginx vhost (your proxy — not in this repo)

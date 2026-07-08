@@ -35,8 +35,9 @@ npm run dev        # serves on port 5173 (HMR)
 
 Requires the Museotek Box Backend running and reachable (default `http://localhost:8080`, context
 path `/museotekbox`), and a Keycloak client `museotek-box-web` registered in the `uniche` realm at
-`https://idp.uniche-eccch.eu` with the right redirect URIs for whatever origin you're serving this
-app from.
+`https://idp.uniche-eccch.eu`. For `npm run dev` (port 5173) the redirect URI is already registered
+and confirmed working; for the Dockerised build (port 8083) it isn't yet — see DEPLOYMENT.md §2a
+for the exact values and how to add them.
 
 Open the app, sign in, and the Dashboard shows your profile and the authorization context resolved
 by the backend: platform admins see `platform admin: yes`; everyone else sees their managed

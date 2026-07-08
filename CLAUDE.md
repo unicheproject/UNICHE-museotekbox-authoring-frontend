@@ -56,7 +56,8 @@ npm run test        # Vitest: can() rule + cache TTL/ETag + slugify
 npm run test:watch
 ```
 Requires the Museotek Box Backend running and reachable, and a Keycloak client `museotek-box-web`
-registered in the `uniche` realm at `https://idp.uniche-eccch.eu`.
+registered in the `uniche` realm at `https://idp.uniche-eccch.eu` — see DEPLOYMENT.md §2a for the
+exact local-dev redirect URIs / web origins per port.
 
 ## Runtime config
 Browser-facing values (`IDP_URL`, `BACKEND_URL`, `REALM`, `CLIENT_ID`, `AUDIENCE`) are injected
