@@ -1,0 +1,15 @@
+# Dependencies / build
+node_modules/
+dist/
+*.local
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.log

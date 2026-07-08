@@ -1,0 +1,40 @@
+# Museotek Box Frontend — brings up ONLY the SPA host (nginx).
+# The Museotek Box Backend runs from its own repo; the browser reaches it and the Keycloak IdP
+# at the configured URLs.
+#
+# Prerequisites:
+#   docker network create museotek-box     # once per host, shared with the backend container
+#   cp .env.example .env
+# Then:
+#   docker compose up -d --build
+name: museotek-box-frontend
+
+services:
+  frontend-web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: museotek-box/frontend:0.1.0
+    environment:
+      # These are baked into /config.js at start and consumed by the BROWSER.
+      # IDP_URL must equal the issuer the Museotek Box Backend validates (issuer-consistency rule).
+      IDP_URL: ${IDP_URL:-https://idp.uniche-eccch.eu}
+      REALM: ${REALM:-uniche}
+      CLIENT_ID: ${CLIENT_ID:-museotek-box-web}
+      AUDIENCE: ${AUDIENCE:-uniche-platform}
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:8080}
+    ports:
+      - "${FRONTEND_PORT:-8083}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks: [museotek-box]
+
+networks:
+  museotek-box:
+    external: true
