@@ -43,7 +43,7 @@ async function submit() {
   submitting.value = true
   error.value = null
   try {
-    const created = await createProject(orgId.value, { name: name.value, slug: slug.value, toolSlug: 'museotek-box' })
+    const created = await createProject(orgId.value, { name: name.value, slug: slug.value, toolSlug: 'museotekbox' })
     router.push(`/experiences/${created.id}`)
   } catch (e) {
     error.value = describeError(e)
