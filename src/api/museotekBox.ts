@@ -66,7 +66,6 @@ export interface ProjectDto {
 export interface CreateProjectRequest {
   name: string
   slug: string
-  toolSlug: string
 }
 
 export interface UpdateProjectRequest {
