@@ -9,6 +9,7 @@ import DeletedExperiences from '@/views/DeletedExperiences.vue'
 import LibrarySection from '@/views/LibrarySection.vue'
 import BoxesSection from '@/views/BoxesSection.vue'
 import MembersSection from '@/views/MembersSection.vue'
+import Account from '@/views/Account.vue'
 
 // IMPORTANT: created via a factory, not at module load. createWebHistory() captures the current
 // URL at creation time; if the router were created while the post-login OIDC fragment
@@ -31,6 +32,7 @@ export function createAppRouter() {
       { path: '/library', name: 'library', component: LibrarySection },
       { path: '/boxes', name: 'boxes', component: BoxesSection },
       { path: '/members', name: 'members', component: MembersSection },
+      { path: '/account', name: 'account', component: Account },
     ],
   })
 
