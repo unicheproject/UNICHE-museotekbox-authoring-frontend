@@ -99,9 +99,9 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="mx-auto max-w-[1180px]">
+  <div>
     <!-- Top row -->
-    <header class="mb-[22px] flex items-start justify-between gap-4">
+    <header class="mb-[22px] flex flex-wrap items-start justify-between gap-4">
       <div>
         <p class="overline mb-1 text-brand-purple">Authoring Dashboard</p>
         <h1 class="text-xl font-extrabold text-foreground">

@@ -17,7 +17,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-md">
+  <div class="w-full max-w-md">
     <Card>
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
