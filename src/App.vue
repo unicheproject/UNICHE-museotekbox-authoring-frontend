@@ -2,10 +2,11 @@
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { FolderOpen, LayoutGrid, LogOut, Menu, Package, Sparkles, Users } from 'lucide-vue-next'
+import { FolderOpen, LayoutGrid, Menu, Package, Sparkles, Users } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthzStore } from '@/stores/authz'
 import { useOrgNames } from '@/lib/useOrgNames'
+import SidebarUser from '@/components/shell/SidebarUser.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -117,27 +118,12 @@ const navActive = 'bg-white/10 font-bold text-white'
         </RouterLink>
       </nav>
 
-      <div class="flex items-center gap-3 border-t border-white/[0.08] px-4 py-4">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-purple text-[11px] font-extrabold text-white"
-        >
-          {{ initials }}
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-xs font-bold text-white">
-            {{ profile?.name ?? profile?.username ?? '—' }}
-          </p>
-          <p class="truncate text-[11px] text-white/40">{{ orgLabel }}</p>
-        </div>
-        <button
-          class="shrink-0 rounded-sm p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
-          title="Sign out"
-          aria-label="Sign out"
-          @click="authStore.logout()"
-        >
-          <LogOut class="h-4 w-4" />
-        </button>
-      </div>
+      <SidebarUser
+        :name="profile?.name ?? profile?.username ?? '—'"
+        :organisation="orgLabel"
+        :initials="initials"
+        @sign-out="authStore.logout()"
+      />
     </aside>
 
     <!-- min-w-0 so a wide child (the data table) can shrink instead of stretching this column. -->

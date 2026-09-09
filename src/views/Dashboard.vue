@@ -8,12 +8,11 @@ import { describeError, listProjects, type ProjectDto } from '@/api/museotekBox'
 import { useOrgNames } from '@/lib/useOrgNames'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const authStore = useAuthStore()
 const authzStore = useAuthzStore()
 const { profile } = storeToRefs(authStore)
-const { context, loading: authzLoading, error: authzError } = storeToRefs(authzStore)
+const { context, loading: authzLoading } = storeToRefs(authzStore)
 const { names: orgNames, resolve: resolveOrgNames } = useOrgNames()
 
 const experiences = ref<ProjectDto[]>([])
@@ -210,64 +209,5 @@ onMounted(load)
         </RouterLink>
       </li>
     </ul>
-
-    <!-- Identity & authorization detail — the v1 purpose of this screen, kept in full. -->
-    <div class="mt-6 grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader class="pb-3"><CardTitle class="text-[15px]">Profile</CardTitle></CardHeader>
-        <CardContent class="space-y-1.5 pt-0 text-[13px]">
-          <div><span class="text-muted-foreground">Name:</span> {{ profile?.name ?? '—' }}</div>
-          <div><span class="text-muted-foreground">Username:</span> {{ profile?.username ?? '—' }}</div>
-          <div><span class="text-muted-foreground">Email:</span> {{ profile?.email ?? '—' }}</div>
-          <div class="break-all">
-            <span class="text-muted-foreground">Subject:</span> {{ profile?.subject ?? '—' }}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader class="pb-3">
-          <CardTitle class="text-[15px]">Authorization</CardTitle>
-        </CardHeader>
-        <CardContent class="space-y-3 pt-0 text-[13px]">
-          <p v-if="authzLoading" class="text-muted-foreground">Loading…</p>
-          <p v-else-if="authzError" class="text-destructive">{{ authzError }}</p>
-          <template v-else-if="context">
-            <div class="flex items-center gap-2">
-              <span class="text-muted-foreground">Platform admin:</span>
-              <Badge :variant="context.platformAdmin ? 'deep' : 'neutral'">
-                {{ context.platformAdmin ? 'yes' : 'no' }}
-              </Badge>
-            </div>
-
-            <div>
-              <p class="overline mb-1.5 text-muted-foreground">Managed organisations</p>
-              <ul v-if="context.managedOrganisations.length" class="flex flex-wrap gap-1.5">
-                <li v-for="orgId in context.managedOrganisations" :key="orgId">
-                  <Badge variant="purple">{{ orgNames[orgId] ?? orgId }}</Badge>
-                </li>
-              </ul>
-              <p v-else class="caption">none</p>
-            </div>
-
-            <div>
-              <p class="overline mb-1.5 text-muted-foreground">Experience memberships</p>
-              <ul v-if="context.projectMemberships.length" class="space-y-1">
-                <li v-for="m in context.projectMemberships" :key="m.projectId">
-                  <RouterLink
-                    :to="`/experiences/${m.projectId}`"
-                    class="font-semibold text-brand-deep hover:underline"
-                  >
-                    {{ experiences.find((e) => e.id === m.projectId)?.name ?? m.projectId }}
-                  </RouterLink>
-                  <span class="text-muted-foreground"> · {{ m.role.toLowerCase() }}</span>
-                </li>
-              </ul>
-              <p v-else class="caption">none</p>
-            </div>
-          </template>
-        </CardContent>
-      </Card>
-    </div>
   </div>
 </template>
