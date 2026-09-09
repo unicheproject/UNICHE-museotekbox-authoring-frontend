@@ -5,6 +5,7 @@ import Login from '@/views/Login.vue'
 import Experiences from '@/views/Experiences.vue'
 import CreateExperience from '@/views/CreateExperience.vue'
 import ExperienceDetail from '@/views/ExperienceDetail.vue'
+import DeletedExperiences from '@/views/DeletedExperiences.vue'
 
 // IMPORTANT: created via a factory, not at module load. createWebHistory() captures the current
 // URL at creation time; if the router were created while the post-login OIDC fragment
@@ -17,8 +18,10 @@ export function createAppRouter() {
       { path: '/login', name: 'login', component: Login, meta: { public: true } },
       { path: '/', name: 'dashboard', component: Dashboard },
       { path: '/experiences', name: 'experiences', component: Experiences },
-      // Must come before '/experiences/:projectId' so 'new' is not captured as a project id.
+      // Must come before '/experiences/:projectId' so 'new' and 'deleted' are not captured as
+      // project ids.
       { path: '/experiences/new', name: 'experience-new', component: CreateExperience },
+      { path: '/experiences/deleted', name: 'experiences-deleted', component: DeletedExperiences },
       { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail },
     ],
   })
