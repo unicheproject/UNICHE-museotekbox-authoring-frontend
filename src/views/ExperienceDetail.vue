@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { ArrowLeft } from 'lucide-vue-next'
 import { useAuthzStore } from '@/stores/authz'
-import { getProject, updateProject, deleteProject, describeError, type ProjectDto } from '@/api/museotekBox'
+import { deleteProject, getProject, updateProject } from '@/api/museotekBox'
 import { useOrgNames } from '@/lib/useOrgNames'
+import { useMutation, useQuery } from '@/lib/useQuery'
+import { statusVariant } from '@/lib/status'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/ui/dialog'
+import { Alert } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { FormField } from '@/components/ui/form'
+import { ConfirmDialog, FormDialog } from '@/components/ui/dialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,112 +22,147 @@ const authzStore = useAuthzStore()
 const { names: orgNames, resolve: resolveOrgNames } = useOrgNames()
 
 const projectId = computed(() => route.params.projectId as string)
-const experience = ref<ProjectDto | null>(null)
-const loading = ref(false)
-const error = ref<string | null>(null)
+
+const { data: experience, pending, error } = useQuery(
+  () => ['project', projectId.value],
+  () => getProject(projectId.value),
+)
+
+watch(experience, (value) => value && resolveOrgNames([value.orgId]), { immediate: true })
 
 const canManage = computed(() =>
   experience.value ? authzStore.can('delete', { orgId: experience.value.orgId }) : false,
 )
 
-const editing = ref(false)
+// Both writes invalidate the list as well as this experience, so a return to /experiences is fresh.
+const update = useMutation(updateProject, { invalidates: ['project', 'projects'] })
+const remove = useMutation(deleteProject, { invalidates: ['project', 'projects'] })
+
+const editOpen = ref(false)
 const editName = ref('')
-const saving = ref(false)
-
-const deleteOpen = ref(false)
-const deleting = ref(false)
-const deleteError = ref<string | null>(null)
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    await authzStore.load()
-    experience.value = await getProject(projectId.value)
-    await resolveOrgNames([experience.value.orgId])
-  } catch (e) {
-    error.value = describeError(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
+const saved = ref(false)
 
 function startEdit() {
   if (!experience.value) return
   editName.value = experience.value.name
-  editing.value = true
+  update.reset()
+  editOpen.value = true
 }
 
 async function saveEdit() {
   if (!experience.value) return
-  saving.value = true
-  try {
-    experience.value = await updateProject(experience.value.id, { name: editName.value })
-    editing.value = false
-  } catch (e) {
-    error.value = describeError(e)
-  } finally {
-    saving.value = false
+  const outcome = await update.mutate(experience.value.id, { name: editName.value })
+  if (outcome.ok) {
+    editOpen.value = false
+    saved.value = true
   }
 }
 
+const deleteOpen = ref(false)
+
 async function confirmDelete() {
   if (!experience.value) return
-  deleting.value = true
-  deleteError.value = null
-  try {
-    await deleteProject(experience.value.id)
-    router.push('/experiences')
-  } catch (e) {
-    deleteError.value = describeError(e)
-  } finally {
-    deleting.value = false
-  }
+  const outcome = await remove.mutate(experience.value.id)
+  if (outcome.ok) router.push('/experiences')
 }
+
+onMounted(() => authzStore.load())
 </script>
 
 <template>
   <div class="space-y-6">
-    <p v-if="loading" class="text-sm text-muted-foreground">Loading…</p>
-    <p v-else-if="error" class="text-sm text-destructive">{{ error }}</p>
+    <RouterLink
+      to="/experiences"
+      class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-overline text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <ArrowLeft class="h-3.5 w-3.5" />
+      Experiences
+    </RouterLink>
+
+    <Alert v-if="error" variant="error" title="Couldn't load this experience">{{ error }}</Alert>
+
+    <Card v-else-if="pending">
+      <CardHeader><Skeleton class="h-6 w-56" /></CardHeader>
+      <CardContent class="space-y-2">
+        <Skeleton class="h-4 w-64" />
+        <Skeleton class="h-4 w-40" />
+        <Skeleton class="h-4 w-48" />
+      </CardContent>
+    </Card>
 
     <template v-else-if="experience">
+      <Alert v-if="saved" variant="success" dismissible @dismiss="saved = false">
+        Changes saved.
+      </Alert>
+
       <Card>
         <CardHeader>
-          <div class="flex items-center justify-between">
-            <CardTitle v-if="!editing">{{ experience.name }}</CardTitle>
-            <div v-else class="flex items-center gap-2">
-              <Input v-model="editName" />
-              <Button size="sm" :disabled="saving || !editName" @click="saveEdit">Save</Button>
-              <Button size="sm" variant="outline" :disabled="saving" @click="editing = false">Cancel</Button>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="space-y-2">
+              <CardTitle>{{ experience.name }}</CardTitle>
+              <Badge :variant="statusVariant(experience.status)" dot>{{ experience.status }}</Badge>
             </div>
-            <Button v-if="canManage && !editing" variant="outline" size="sm" @click="startEdit">Edit</Button>
+            <Button v-if="canManage" variant="outline" size="sm" @click="startEdit">Edit</Button>
           </div>
         </CardHeader>
-        <CardContent class="space-y-1 text-sm text-muted-foreground">
-          <div>Organisation: {{ orgNames[experience.orgId] ?? experience.orgId }}</div>
-          <div>Slug: {{ experience.slug }}</div>
-          <div>Status: {{ experience.status }}</div>
-          <div>Tool: {{ experience.toolSlug }}</div>
+        <CardContent>
+          <dl class="grid gap-4 text-sm sm:grid-cols-2">
+            <div>
+              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                Organisation
+              </dt>
+              <dd class="mt-1">{{ orgNames[experience.orgId] ?? experience.orgId }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                Slug
+              </dt>
+              <dd class="mt-1 text-muted-foreground">{{ experience.slug }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                Tool
+              </dt>
+              <dd class="mt-1 text-muted-foreground">{{ experience.toolSlug }}</dd>
+            </div>
+          </dl>
         </CardContent>
       </Card>
 
       <Card v-if="canManage">
-        <CardHeader><CardTitle>Danger zone</CardTitle></CardHeader>
-        <CardContent>
+        <CardHeader><CardTitle class="text-base">Danger zone</CardTitle></CardHeader>
+        <CardContent class="space-y-3">
+          <p class="text-sm text-muted-foreground">
+            Deleting hides the experience from everyone. A platform administrator can restore it.
+          </p>
           <Button variant="destructive" @click="deleteOpen = true">Delete experience</Button>
         </CardContent>
       </Card>
     </template>
 
+    <FormDialog
+      v-model:open="editOpen"
+      title="Edit experience"
+      description="Only the name can be changed — the slug and tool are fixed once created."
+      submit-label="Save changes"
+      :busy="update.loading.value"
+      :error="update.error.value"
+      :submit-disabled="!editName.trim()"
+      @submit="saveEdit"
+    >
+      <FormField label="Name" required :error="update.fieldErrors.value.name">
+        <template #default="{ id, invalid, describedBy }">
+          <Input :id="id" v-model="editName" :invalid="invalid" :aria-describedby="describedBy" />
+        </template>
+      </FormField>
+    </FormDialog>
+
     <ConfirmDialog
       v-model:open="deleteOpen"
       title="Delete this experience?"
       description="It can be restored by a platform admin."
-      :busy="deleting"
-      :error="deleteError"
+      :busy="remove.loading.value"
+      :error="remove.error.value"
       @confirm="confirmDelete"
     />
   </div>
