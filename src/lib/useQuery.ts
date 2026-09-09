@@ -175,6 +175,12 @@ export function clearQueryCache(): void {
 export interface UseMutationOptions {
   /** Query keys (by prefix) to invalidate after a successful call. */
   invalidates?: QueryKey[]
+  /**
+   * Translate an error this caller understands into its own message — returning null falls back to
+   * the generic parsing. Lets a screen say "that RFID tag is already in use" for a 409 instead of
+   * relaying whatever prose the backend happened to send.
+   */
+  describe?: (error: unknown) => string | null
 }
 
 export interface MutationOutcome<R> {
@@ -218,7 +224,7 @@ export function useMutation<Args extends unknown[], R>(
       return { ok: true, data }
     } catch (e) {
       const parsed = parseError(e)
-      error.value = parsed.message
+      error.value = options.describe?.(e) ?? parsed.message
       fieldErrors.value = parsed.fields
       return { ok: false }
     } finally {
