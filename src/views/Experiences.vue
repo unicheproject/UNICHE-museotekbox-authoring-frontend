@@ -74,8 +74,11 @@ const list = useDataList<ProjectDto>(data, {
     name: (p) => p.name,
     organisation: (p) => orgNames.value[p.orgId] ?? p.orgId,
     status: (p) => p.status,
+    updated: (p) => p.updatedAt ?? '',
   },
-  initialSort: { key: 'name', direction: 'asc' },
+  // Most recently touched first: the natural default for a working list. Experiences with no
+  // timestamp (older backend builds) sink to the bottom rather than to the top.
+  initialSort: { key: 'updated', direction: 'desc' },
   pageSize: 12,
   filters,
 })
@@ -86,8 +89,15 @@ const columns = computed<DataTableColumn<ProjectDto>[]>(() => [
   { key: 'name', label: 'Name', sortable: true },
   { key: 'organisation', label: 'Organisation', sortable: true },
   { key: 'status', label: 'Status', sortable: true, headClass: 'w-32' },
+  { key: 'updated', label: 'Updated', sortable: true, headClass: 'w-32' },
   { key: 'slug', label: 'Slug', class: 'text-muted-foreground' },
 ])
+
+/** Short, locale-aware date; the exact time is noise in a list. */
+function formatDate(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
+}
 
 const toggleBase =
   'inline-flex h-9 w-9 items-center justify-center rounded-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
@@ -196,6 +206,12 @@ const toggleBase =
         </template>
         <template #cell-status="{ row }">
           <Badge :variant="statusVariant(row.status)" dot>{{ row.status }}</Badge>
+        </template>
+        <template #cell-updated="{ row }">
+          <span v-if="row.updatedAt" class="text-muted-foreground">
+            {{ formatDate(row.updatedAt) }}
+          </span>
+          <span v-else class="text-muted-foreground">—</span>
         </template>
       </DataTable>
     </template>
