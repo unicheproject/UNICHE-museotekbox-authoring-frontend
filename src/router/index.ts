@@ -6,6 +6,9 @@ import Experiences from '@/views/Experiences.vue'
 import CreateExperience from '@/views/CreateExperience.vue'
 import ExperienceDetail from '@/views/ExperienceDetail.vue'
 import DeletedExperiences from '@/views/DeletedExperiences.vue'
+import LibrarySection from '@/views/LibrarySection.vue'
+import BoxesSection from '@/views/BoxesSection.vue'
+import MembersSection from '@/views/MembersSection.vue'
 
 // IMPORTANT: created via a factory, not at module load. createWebHistory() captures the current
 // URL at creation time; if the router were created while the post-login OIDC fragment
@@ -23,6 +26,11 @@ export function createAppRouter() {
       { path: '/experiences/new', name: 'experience-new', component: CreateExperience },
       { path: '/experiences/deleted', name: 'experiences-deleted', component: DeletedExperiences },
       { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail },
+      // Sections whose backend does not exist yet: routable so the navigation is complete, but
+      // they render a "coming soon" body rather than fake data (see docs/BACKEND-GAPS.md).
+      { path: '/library', name: 'library', component: LibrarySection },
+      { path: '/boxes', name: 'boxes', component: BoxesSection },
+      { path: '/members', name: 'members', component: MembersSection },
     ],
   })
 
