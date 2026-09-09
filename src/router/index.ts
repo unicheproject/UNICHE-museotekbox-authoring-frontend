@@ -10,6 +10,8 @@ import LibrarySection from '@/views/LibrarySection.vue'
 import BoxesSection from '@/views/BoxesSection.vue'
 import MembersSection from '@/views/MembersSection.vue'
 import Account from '@/views/Account.vue'
+import ScanObjects from '@/views/ScanObjects.vue'
+import ScanObjectDetail from '@/views/ScanObjectDetail.vue'
 
 // IMPORTANT: created via a factory, not at module load. createWebHistory() captures the current
 // URL at creation time; if the router were created while the post-login OIDC fragment
@@ -30,6 +32,14 @@ export function createAppRouter() {
       // Sections whose backend does not exist yet: routable so the navigation is complete, but
       // they render a "coming soon" body rather than fake data (see docs/BACKEND-GAPS.md).
       { path: '/library', name: 'library', component: LibrarySection },
+      // Scan objects are organisation-scoped on the backend, so the organisation is part of the
+      // detail path: a shared or reopened link would otherwise not know where to look.
+      { path: '/scan-objects', name: 'scan-objects', component: ScanObjects },
+      {
+        path: '/scan-objects/:orgId/:scanObjectId',
+        name: 'scan-object',
+        component: ScanObjectDetail,
+      },
       { path: '/boxes', name: 'boxes', component: BoxesSection },
       { path: '/members', name: 'members', component: MembersSection },
       { path: '/account', name: 'account', component: Account },
