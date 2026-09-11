@@ -36,8 +36,6 @@ const { data, pending, error } = useQuery(
 
 const kindFilter = ref('')
 const typeFilter = ref('')
-const reusableFilter = ref('')
-const rfidFilter = ref('')
 
 const kindOptions = computed<SelectOption[]>(() => [
   { value: '', label: 'All kinds' },
@@ -58,18 +56,6 @@ const typeOptions = computed<SelectOption[]>(() => {
   ]
 })
 
-const reusableOptions: SelectOption[] = [
-  { value: '', label: 'Reusable: any' },
-  { value: 'yes', label: 'Reusable' },
-  { value: 'no', label: 'Single use' },
-]
-
-const rfidOptions: SelectOption[] = [
-  { value: '', label: 'RFID: any' },
-  { value: 'yes', label: 'Has RFID tag' },
-  { value: 'no', label: 'No RFID tag' },
-]
-
 const filters = computed(() => {
   const predicates: ((o: ScanObjectDto) => boolean)[] = []
   if (kindFilter.value) {
@@ -77,14 +63,6 @@ const filters = computed(() => {
   }
   if (typeFilter.value) {
     predicates.push((o) => String(o.scanObjectTypeId ?? '') === typeFilter.value)
-  }
-  if (reusableFilter.value) {
-    const want = reusableFilter.value === 'yes'
-    predicates.push((o) => Boolean(o.reusable) === want)
-  }
-  if (rfidFilter.value) {
-    const want = rfidFilter.value === 'yes'
-    predicates.push((o) => Boolean(o.rfidTag) === want)
   }
   return predicates
 })
@@ -175,13 +153,6 @@ async function submitCreate() {
       </label>
       <Select v-model="kindFilter" :options="kindOptions" class="w-44" aria-label="Filter by kind" />
       <Select v-model="typeFilter" :options="typeOptions" class="w-36" aria-label="Filter by type" />
-      <Select
-        v-model="reusableFilter"
-        :options="reusableOptions"
-        class="w-40"
-        aria-label="Filter by reusability"
-      />
-      <Select v-model="rfidFilter" :options="rfidOptions" class="w-40" aria-label="Filter by RFID tag" />
     </div>
 
     <DataTable
