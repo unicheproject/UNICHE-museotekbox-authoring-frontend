@@ -89,10 +89,12 @@ const navActive = 'bg-white/10 font-bold text-white'
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="border-b border-white/[0.08] px-5 pb-[18px] pt-6">
-        <div class="text-[17px] font-extrabold tracking-[0.02em] text-white">
-          museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
+        <div class="flex items-center gap-2.5">
+          <img src="/museotekbox_mark.png" alt="" class="h-8 w-8 object-contain" />
+          <div class="text-[17px] font-extrabold tracking-[0.02em] text-white">
+            museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
+          </div>
         </div>
-        <p class="mt-1 text-[11px] font-medium text-white/40">Authoring Environment</p>
       </div>
 
       <nav class="flex flex-1 flex-col gap-1 overflow-y-auto px-2.5 py-4">
@@ -140,6 +142,7 @@ const navActive = 'bg-white/10 font-bold text-white'
         >
           <Menu class="h-5 w-5" />
         </button>
+        <img src="/museotekbox_mark.png" alt="" class="h-7 w-7 object-contain" />
         <div class="text-[15px] font-extrabold tracking-[0.02em] text-white">
           museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
         </div>
