@@ -64,7 +64,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :aria-label="title"
         class="relative z-10 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg"
       >
-        <h2 class="text-lg font-semibold">{{ title }}</h2>
+        <h2 class="text-lg font-extrabold tracking-[-0.01em]">{{ title }}</h2>
         <p v-if="description" class="mt-2 text-sm text-muted-foreground">{{ description }}</p>
         <p v-if="error" role="alert" class="mt-4 text-sm text-destructive">{{ error }}</p>
         <div class="mt-6 flex justify-end gap-2">

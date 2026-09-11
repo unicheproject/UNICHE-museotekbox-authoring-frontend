@@ -19,8 +19,12 @@ export const buttonVariants = cva(
         /** Deep indigo solid — the default action. */
         default: 'bg-brand-deep text-white shadow-xs hover:bg-[#3a1470] hover:-translate-y-px',
         /** Brand gradient — main CTA only, at most one per screen. */
+        /*
+         * `disabled:bg-none` drops the gradient IMAGE; without it the disabled background-colour
+         * from the base classes sits behind the gradient and the button still looks live.
+         */
         gradient:
-          'bg-grad-brand text-white shadow-cta [text-shadow:0_1px_3px_rgba(76,29,139,0.45)] hover:-translate-y-px hover:shadow-cta-hover disabled:!text-white',
+          'bg-grad-brand text-white shadow-xs [text-shadow:0_1px_3px_rgba(76,29,139,0.45)] hover:-translate-y-px hover:shadow-cta disabled:bg-none disabled:[text-shadow:none]',
         outline: 'border-2 border-brand-deep bg-transparent text-brand-deep hover:bg-secondary',
         ghost: 'border-2 border-transparent bg-transparent text-brand-purple hover:bg-secondary',
         /** Muted — secondary actions inside content. */

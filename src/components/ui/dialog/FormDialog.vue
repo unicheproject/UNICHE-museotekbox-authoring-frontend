@@ -83,7 +83,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <form novalidate @submit.prevent="emit('submit')">
           <div class="flex items-start justify-between gap-4 border-b px-6 py-4">
             <div>
-              <h2 class="text-lg font-semibold">{{ title }}</h2>
+              <h2 class="text-lg font-extrabold tracking-[-0.01em]">{{ title }}</h2>
               <p v-if="description" class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
             </div>
             <button
@@ -105,7 +105,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
             <Button type="button" variant="outline" :disabled="busy" @click="close">
               {{ cancelLabel }}
             </Button>
-            <Button type="submit" :disabled="busy || submitDisabled">
+            <Button type="submit" variant="gradient" :disabled="busy || submitDisabled">
               {{ busy ? 'Saving…' : submitLabel }}
             </Button>
           </div>

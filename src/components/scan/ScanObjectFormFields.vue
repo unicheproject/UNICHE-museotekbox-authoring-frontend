@@ -74,7 +74,6 @@ const colourOptions: SelectOption[] = CARD_COLOURS.map((colour) => ({
       v-if="form.kind === 'PRINTED_IMAGE'"
       label="Image reference"
       :error="errors.imageUrl"
-      hint="A URL or path to the image. The backend stores a reference, so there is no upload yet."
     >
       <template #default="{ id, invalid, describedBy }">
         <Input
@@ -91,7 +90,6 @@ const colourOptions: SelectOption[] = CARD_COLOURS.map((colour) => ({
       v-if="form.kind === 'THREE_D_PRINTED_OBJECT'"
       label="Model reference"
       :error="errors.modelRef"
-      hint="A reference to the 3D model. The backend stores a reference, so there is no upload yet."
     >
       <template #default="{ id, invalid, describedBy }">
         <Input
@@ -107,7 +105,6 @@ const colourOptions: SelectOption[] = CARD_COLOURS.map((colour) => ({
     <FormField
       label="Scan object type"
       :error="errors.scanObjectTypeId"
-      hint="The numeric id of the type. There is no endpoint listing types yet, so it cannot be picked by name."
     >
       <template #default="{ id, invalid, describedBy }">
         <Input
