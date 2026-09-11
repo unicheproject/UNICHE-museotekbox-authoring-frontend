@@ -3,8 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
 /**
- * Shared body for the navigation sections whose backend does not exist yet (Library, Boxes,
- * Members). They are routable so the information architecture is settled and reviewable, but they
+ * Shared body for the navigation sections whose backend does not exist yet (Boxes, Members). They are routable so the information architecture is settled and reviewable, but they
  * state plainly that there is nothing to show rather than faking data.
  * The endpoints they are waiting on are listed in docs/BACKEND-GAPS.md.
  */

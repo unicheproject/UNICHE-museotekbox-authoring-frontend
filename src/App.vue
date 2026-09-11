@@ -2,7 +2,7 @@
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { FolderOpen, LayoutGrid, Menu, Package, ScanLine, Sparkles, Users } from 'lucide-vue-next'
+import { Briefcase, LayoutGrid, Menu, Package, ScanLine, Users } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthzStore } from '@/stores/authz'
 import { useOrgNames } from '@/lib/useOrgNames'
@@ -101,16 +101,12 @@ const navActive = 'bg-white/10 font-bold text-white'
           Dashboard
         </RouterLink>
         <RouterLink to="/experiences" :class="[navItem, navIdle]" :active-class="navActive">
-          <Sparkles class="h-4 w-4" />
+          <Briefcase class="h-4 w-4" />
           Experiences
         </RouterLink>
         <RouterLink to="/scan-objects" :class="[navItem, navIdle]" :active-class="navActive">
           <ScanLine class="h-4 w-4" />
           Scan objects
-        </RouterLink>
-        <RouterLink to="/library" :class="[navItem, navIdle]" :active-class="navActive">
-          <FolderOpen class="h-4 w-4" />
-          Library
         </RouterLink>
         <RouterLink to="/boxes" :class="[navItem, navIdle]" :active-class="navActive">
           <Package class="h-4 w-4" />

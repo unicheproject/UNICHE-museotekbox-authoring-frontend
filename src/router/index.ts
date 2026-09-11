@@ -6,7 +6,6 @@ import Experiences from '@/views/Experiences.vue'
 import CreateExperience from '@/views/CreateExperience.vue'
 import ExperienceDetail from '@/views/ExperienceDetail.vue'
 import DeletedExperiences from '@/views/DeletedExperiences.vue'
-import LibrarySection from '@/views/LibrarySection.vue'
 import ScanObjects from '@/views/ScanObjects.vue'
 import ScanObjectDetail from '@/views/ScanObjectDetail.vue'
 import Boxes from '@/views/Boxes.vue'
@@ -30,9 +29,6 @@ export function createAppRouter() {
       { path: '/experiences/new', name: 'experience-new', component: CreateExperience },
       { path: '/experiences/deleted', name: 'experiences-deleted', component: DeletedExperiences },
       { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail },
-      // Sections whose backend does not exist yet: routable so the navigation is complete, but
-      // they render a "coming soon" body rather than fake data (see docs/BACKEND-GAPS.md).
-      { path: '/library', name: 'library', component: LibrarySection },
       // Scan objects and boxes are organisation-scoped on the backend, so the organisation is part
       // of the detail path: a shared or reopened link would otherwise not know where to look.
       { path: '/scan-objects', name: 'scan-objects', component: ScanObjects },
