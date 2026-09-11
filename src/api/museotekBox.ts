@@ -343,3 +343,22 @@ export async function updateBox(orgId: string, boxId: number, body: BoxRequest):
 export async function deleteBox(orgId: string, boxId: number): Promise<void> {
   await http.delete(`/organisations/${orgId}/boxes/${boxId}`)
 }
+
+/**
+ * Organisation members, as returned by GET /organisations/{orgId}/members. `displayName` and
+ * `email` come from the IdP profile, so either can be missing for an account that has never signed
+ * in; `since` is the ISO instant the person joined the organisation.
+ */
+export interface MemberDto {
+  /** Null for a person who exists only as an invitation/local row and has no IdP account yet. */
+  userId: string | null
+  email: string | null
+  displayName: string | null
+  role: string | null
+  since: string | null
+}
+
+export async function listMembers(orgId: string): Promise<MemberDto[]> {
+  const res = await http.get<MemberDto[]>(`/organisations/${orgId}/members`)
+  return res.data
+}
