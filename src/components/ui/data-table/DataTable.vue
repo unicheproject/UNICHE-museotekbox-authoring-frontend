@@ -1,9 +1,11 @@
 <script setup lang="ts" generic="T">
 import { computed } from 'vue'
+import type { Component } from 'vue'
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-vue-next'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert } from '@/components/ui/alert'
+import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
 import type { DataTableColumn } from './types'
 import type { SortDirection } from '@/lib/useDataList'
@@ -25,7 +27,7 @@ const props = defineProps<{
   error?: string | null
   /** Shown when there are no rows and nothing is loading or failing. */
   emptyTitle?: string
-  emptyHint?: string
+  emptyIcon?: Component
   clickable?: boolean
   searchable?: boolean
   searchPlaceholder?: string
@@ -126,10 +128,9 @@ function cellText(column: DataTableColumn<T>, row: T): string {
         </template>
 
         <TableRow v-else-if="showEmpty">
-          <TableCell :colspan="columnCount" class="py-12 text-center">
+          <TableCell :colspan="columnCount" class="p-0">
             <slot name="empty">
-              <p class="text-sm font-semibold">{{ emptyTitle ?? 'Nothing to show' }}</p>
-              <p v-if="emptyHint" class="mt-1 text-sm text-muted-foreground">{{ emptyHint }}</p>
+              <EmptyState :title="emptyTitle ?? 'Nothing to show'" :icon="emptyIcon" />
             </slot>
           </TableCell>
         </TableRow>

@@ -67,7 +67,11 @@
    * Two recurring styleguide text roles that would otherwise be retyped as the same six
    * utilities on every screen.
    */
-  .overline {
+  /*
+   * NOT named `.overline`: Tailwind ships an `overline` text-decoration utility, and the utilities
+   * layer wins over components, so every label using that name was drawn with a rule above it.
+   */
+  .label-overline {
     @apply text-[10px] font-extrabold uppercase tracking-overline;
   }
   .caption {
