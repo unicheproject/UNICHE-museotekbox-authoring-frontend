@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CalendarDays } from 'lucide-vue-next'
+import { CalendarDays, Users } from 'lucide-vue-next'
 import { listMembers, type MemberDto } from '@/api/museotekBox'
 import { useQuery } from '@/lib/useQuery'
 import { useOrgScope } from '@/lib/useOrgScope'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
+import { Avatar } from '@/components/ui/avatar'
+import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
 
 const { orgId, orgOptions, showPicker, context } = useOrgScope()
 
@@ -37,27 +41,6 @@ function initial(member: MemberDto) {
   return displayName(member).trim().charAt(0).toUpperCase() || '—'
 }
 
-/**
- * Avatar colour is derived from the subject, not picked at random: the same person keeps the same
- * colour on every visit and on every screen that reuses this rule.
- */
-const AVATAR_COLOURS = [
-  'bg-blue-600',
-  'bg-emerald-600',
-  'bg-amber-600',
-  'bg-purple-600',
-  'bg-rose-600',
-  'bg-cyan-700',
-  'bg-indigo-600',
-  'bg-teal-600',
-]
-
-function avatarColour(member: MemberDto) {
-  let hash = 0
-  for (const char of identity(member)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-  return AVATAR_COLOURS[hash % AVATAR_COLOURS.length]
-}
-
 /** `since` is an ISO instant; only the day matters here. */
 function joinedOn(since: string | null) {
   if (!since) return null
@@ -85,20 +68,25 @@ function roleVariant(role: string | null) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold">Members</h1>
-        <p v-if="members.length" class="text-sm text-muted-foreground">
-          {{ members.length }} {{ members.length === 1 ? 'member' : 'members' }}
-        </p>
-      </div>
-      <Select v-if="showPicker" v-model="orgId" :options="orgOptions" class="w-56" aria-label="Organisation" />
-    </div>
+  <div>
+    <PageHeader title="Members">
+      <template #actions>
+        <Select
+          v-if="showPicker"
+          v-model="orgId"
+          :options="orgOptions"
+          class="w-56"
+          aria-label="Organisation"
+        />
+      </template>
+    </PageHeader>
 
     <p v-if="pending" class="text-sm text-muted-foreground">Loading…</p>
     <p v-else-if="error" class="text-sm text-destructive">{{ error }}</p>
-    <p v-else-if="!members.length" class="text-sm text-muted-foreground">No members yet.</p>
+
+    <Card v-else-if="!members.length">
+      <EmptyState title="No members" :icon="Users" />
+    </Card>
 
     <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div
@@ -107,13 +95,9 @@ function roleVariant(role: string | null) {
         class="rounded-lg border border-border bg-card p-5 shadow-xs transition-shadow hover:shadow-sm"
       >
         <div class="flex items-start gap-3">
-          <div
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-            :class="avatarColour(member)"
-            aria-hidden="true"
-          >
-            {{ initial(member) }}
-          </div>
+          <!-- The signed-in user is the one avatar in the accent violet, so they can find
+               themselves in the grid without reading every name. -->
+          <Avatar :initials="initial(member)" :variant="isSelf(member) ? 'purple' : 'deep'" />
           <div class="min-w-0">
             <p class="truncate text-sm font-bold text-foreground">
               {{ displayName(member) }}

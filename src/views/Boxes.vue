@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search } from 'lucide-vue-next'
+import { Package } from 'lucide-vue-next'
 import {
   boxOnline,
   createBox,
@@ -14,7 +14,8 @@ import { useDataList } from '@/lib/useDataList'
 import { useOrgScope } from '@/lib/useOrgScope'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, SearchInput } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/page-header'
 import { Select, type SelectOption } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
 import { FormField } from '@/components/ui/form'
@@ -114,15 +115,9 @@ async function submitCreate() {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold">Boxes</h1>
-        <p class="text-sm text-muted-foreground">
-          The museotekBox devices in this organisation. Status refreshes on its own.
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
+  <div>
+    <PageHeader title="Boxes">
+      <template #actions>
         <Select
           v-if="showPicker"
           v-model="orgId"
@@ -130,94 +125,89 @@ async function submitCreate() {
           class="w-52"
           aria-label="Organisation"
         />
-        <Button variant="gradient" :disabled="!orgId" @click="startCreate">New box</Button>
-      </div>
-    </div>
+        <Button variant="gradient" size="sm" :disabled="!orgId" @click="startCreate">New box</Button>
+      </template>
+    </PageHeader>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <label class="relative min-w-56 flex-1">
-        <span class="sr-only">Search boxes by name or serial</span>
-        <Search
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
+    <div class="space-y-6">
+      <div class="flex flex-wrap items-center gap-3">
+        <SearchInput
           v-model="list.search.value"
-          type="search"
+          label="Search boxes by name or serial"
           placeholder="Search by name or serial…"
-          class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-      </label>
-      <Select v-model="statusFilter" :options="statusOptions" class="w-40" aria-label="Filter by status" />
-    </div>
+        <Select v-model="statusFilter" :options="statusOptions" class="w-40" aria-label="Filter by status" />
+      </div>
 
-    <DataTable
-      :columns="columns"
-      :rows="list.rows.value"
-      :row-key="(row) => String(row.id)"
-      :sort-key="list.sortKey.value"
-      :sort-direction="list.sortDirection.value"
-      :loading="pending"
-      :error="error"
-      clickable
-      empty-title="No boxes yet"
-      empty-hint="Add a box with its name and serial number to start tracking it."
-      @sort="list.toggleSort"
-      @row-click="(row) => router.push(`/boxes/${orgId}/${row.id}`)"
-    >
-      <template #cell-status="{ row }">
-        <Badge :variant="boxOnline(row.status) ? 'success' : 'neutral'" dot>
-          {{ boxOnline(row.status) ? 'Online' : row.status || 'Unknown' }}
-        </Badge>
-      </template>
-      <template #cell-running="{ row }">
-        <span v-if="row.currentProjectId">
-          {{ projectName[row.currentProjectId] ?? row.currentProjectId }}
-        </span>
-        <span v-else class="text-muted-foreground">Nothing running</span>
-      </template>
-    </DataTable>
-
-    <Pagination
-      v-model:page="list.page.value"
-      :page-size="list.pageSize.value"
-      :total="list.total.value"
-    />
-
-    <FormDialog
-      v-model:open="createOpen"
-      title="New box"
-      submit-label="Create"
-      :busy="create.loading.value"
-      :error="create.error.value"
-      :submit-disabled="!name.trim() || !serialNumber.trim()"
-      @submit="submitCreate"
-    >
-      <FormField label="Name" required :error="create.fieldErrors.value.name">
-        <template #default="{ id, invalid, describedBy }">
-          <Input
-            :id="id"
-            v-model="name"
-            :invalid="invalid"
-            :aria-describedby="describedBy"
-            placeholder="e.g. Foyer box"
-          />
-        </template>
-      </FormField>
-      <FormField
-        label="Serial number"
-        required
-        :error="create.fieldErrors.value.serialNumber"
-        hint="Printed on the device."
+      <DataTable
+        :columns="columns"
+        :rows="list.rows.value"
+        :row-key="(row) => String(row.id)"
+        :sort-key="list.sortKey.value"
+        :sort-direction="list.sortDirection.value"
+        :loading="pending"
+        :error="error"
+        clickable
+        empty-title="No boxes"
+        :empty-icon="Package"
+        @sort="list.toggleSort"
+        @row-click="(row) => router.push(`/boxes/${orgId}/${row.id}`)"
       >
-        <template #default="{ id, invalid, describedBy }">
-          <Input
-            :id="id"
-            v-model="serialNumber"
-            :invalid="invalid"
-            :aria-describedby="describedBy"
-          />
+        <template #cell-status="{ row }">
+          <Badge :variant="boxOnline(row.status) ? 'success' : 'neutral'" dot>
+            {{ boxOnline(row.status) ? 'Online' : row.status || 'Unknown' }}
+          </Badge>
         </template>
-      </FormField>
-    </FormDialog>
+        <template #cell-running="{ row }">
+          <span v-if="row.currentProjectId">
+            {{ projectName[row.currentProjectId] ?? row.currentProjectId }}
+          </span>
+          <span v-else class="text-muted-foreground">Nothing running</span>
+        </template>
+      </DataTable>
+
+      <Pagination
+        v-model:page="list.page.value"
+        :page-size="list.pageSize.value"
+        :total="list.total.value"
+      />
+
+      <FormDialog
+        v-model:open="createOpen"
+        title="New box"
+        submit-label="Create"
+        :busy="create.loading.value"
+        :error="create.error.value"
+        :submit-disabled="!name.trim() || !serialNumber.trim()"
+        @submit="submitCreate"
+      >
+        <FormField label="Name" required :error="create.fieldErrors.value.name">
+          <template #default="{ id, invalid, describedBy }">
+            <Input
+              :id="id"
+              v-model="name"
+              :invalid="invalid"
+              :aria-describedby="describedBy"
+              placeholder="e.g. Foyer box"
+            />
+          </template>
+        </FormField>
+        <FormField
+          label="Serial number"
+          required
+          :error="create.fieldErrors.value.serialNumber"
+          hint="Printed on the device."
+        >
+          <template #default="{ id, invalid, describedBy }">
+            <Input
+              :id="id"
+              v-model="serialNumber"
+              :invalid="invalid"
+              :aria-describedby="describedBy"
+            />
+          </template>
+        </FormField>
+      </FormDialog>
+    </div>
   </div>
 </template>

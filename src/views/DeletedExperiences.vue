@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { ArrowLeft, RotateCcw } from 'lucide-vue-next'
+import { RotateCcw, Trash2 } from 'lucide-vue-next'
 import { useAuthzStore } from '@/stores/authz'
 import { listDeletedProjects, restoreProject, type ProjectDto } from '@/api/museotekBox'
 import { useOrgNames } from '@/lib/useOrgNames'
@@ -10,7 +9,9 @@ import { useMutation, useQuery } from '@/lib/useQuery'
 import { useDataList } from '@/lib/useDataList'
 import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
 import { Select, type SelectOption } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -56,7 +57,7 @@ const { data, pending, error } = useQuery(
 
 const list = useDataList<ProjectDto>(data, {
   searchFields: (p) => [p.name],
-  sortValues: { name: (p) => p.name, slug: (p) => p.slug, status: (p) => p.status },
+  sortValues: { name: (p) => p.name, slug: (p) => p.slug },
   initialSort: { key: 'name', direction: 'asc' },
   pageSize: 12,
 })
@@ -79,8 +80,7 @@ async function confirmRestore() {
 
 const columns: DataTableColumn<ProjectDto>[] = [
   { key: 'name', label: 'Name', sortable: true },
-  { key: 'slug', label: 'Slug', sortable: true, class: 'text-muted-foreground' },
-  { key: 'status', label: 'Status', sortable: true },
+  { key: 'slug', label: 'Slug', sortable: true, class: 'font-mono text-xs text-muted-foreground' },
   { key: 'actions', label: '', headClass: 'w-32' },
 ]
 
@@ -88,94 +88,83 @@ onMounted(() => authzStore.load())
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <RouterLink
-          to="/experiences"
-          class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-overline text-muted-foreground transition-colors hover:text-foreground"
+  <div>
+    <PageHeader title="Deleted experiences" back-label="Experiences" back-to="/experiences">
+      <template #actions>
+        <Select
+          v-if="isAdmin && orgOptions.length > 1"
+          v-model="orgId"
+          :options="orgOptions"
+          class="w-60"
+          aria-label="Organisation"
+        />
+      </template>
+    </PageHeader>
+
+    <div class="space-y-6">
+      <Card v-if="!isAdmin">
+        <EmptyState title="Only a platform administrator can restore deleted experiences" />
+      </Card>
+
+      <template v-else>
+        <Alert v-if="restored" variant="success" dismissible @dismiss="restored = null">
+          <strong class="font-bold">{{ restored }}</strong> was restored and is back in the
+          experiences list.
+        </Alert>
+        <Alert v-if="restore.error.value" variant="error" title="Restore failed">
+          {{ restore.error.value }}
+        </Alert>
+
+        <DataTable
+          v-model:search="list.search.value"
+          :columns="columns"
+          :rows="list.rows.value"
+          :row-key="(row) => row.id"
+          :sort-key="list.sortKey.value"
+          :sort-direction="list.sortDirection.value"
+          :loading="pending"
+          :error="error"
+          searchable
+          search-placeholder="Search by name…"
+          empty-title="Nothing deleted"
+          :empty-icon="Trash2"
+          @sort="list.toggleSort"
         >
-          <ArrowLeft class="h-3.5 w-3.5" />
-          Experiences
-        </RouterLink>
-        <h1 class="mt-2 text-2xl font-bold">Deleted experiences</h1>
-        <p class="text-sm text-muted-foreground">
-          Soft-deleted experiences awaiting restore. Deleting never removes data — it only hides it.
-        </p>
-      </div>
-      <Select
-        v-if="isAdmin && orgOptions.length > 1"
-        v-model="orgId"
-        :options="orgOptions"
-        class="w-60"
-        aria-label="Organisation"
+          <template #cell-actions="{ row }">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="restore.loading.value"
+              @click="target = row"
+            >
+              <RotateCcw class="h-3.5 w-3.5" />
+              Restore
+            </Button>
+          </template>
+        </DataTable>
+
+        <Pagination
+          v-model:page="list.page.value"
+          :page-size="list.pageSize.value"
+          :total="list.total.value"
+        />
+      </template>
+
+      <ConfirmDialog
+        :open="target !== null"
+        title="Restore this experience?"
+        :description="
+          target
+            ? `“${target.name}” will reappear in the experiences list for everyone with access.`
+            : undefined
+        "
+        confirm-label="Restore"
+        variant="default"
+        :busy="restore.loading.value"
+        :error="restore.error.value"
+        @update:open="(open) => !open && (target = null)"
+        @confirm="confirmRestore"
       />
     </div>
-
-    <Card v-if="!isAdmin">
-      <CardContent class="py-12 text-center text-sm text-muted-foreground">
-        Only a platform administrator can review and restore deleted experiences.
-      </CardContent>
-    </Card>
-
-    <template v-else>
-      <Alert v-if="restored" variant="success" dismissible @dismiss="restored = null">
-        <strong class="font-bold">{{ restored }}</strong> was restored and is back in the
-        experiences list.
-      </Alert>
-      <Alert v-if="restore.error.value" variant="error" title="Restore failed">
-        {{ restore.error.value }}
-      </Alert>
-
-      <DataTable
-        v-model:search="list.search.value"
-        :columns="columns"
-        :rows="list.rows.value"
-        :row-key="(row) => row.id"
-        :sort-key="list.sortKey.value"
-        :sort-direction="list.sortDirection.value"
-        :loading="pending"
-        :error="error"
-        searchable
-        search-placeholder="Search by name…"
-        empty-title="Nothing deleted here"
-        empty-hint="Deleted experiences in this organisation would appear here."
-        @sort="list.toggleSort"
-      >
-        <template #cell-actions="{ row }">
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="restore.loading.value"
-            @click="target = row"
-          >
-            <RotateCcw class="h-3.5 w-3.5" />
-            Restore
-          </Button>
-        </template>
-      </DataTable>
-
-      <Pagination
-        v-model:page="list.page.value"
-        :page-size="list.pageSize.value"
-        :total="list.total.value"
-      />
-    </template>
-
-    <ConfirmDialog
-      :open="target !== null"
-      title="Restore this experience?"
-      :description="
-        target
-          ? `“${target.name}” will reappear in the experiences list for everyone with access.`
-          : undefined
-      "
-      confirm-label="Restore"
-      variant="default"
-      :busy="restore.loading.value"
-      :error="restore.error.value"
-      @update:open="(open) => !open && (target = null)"
-      @confirm="confirmRestore"
-    />
   </div>
 </template>

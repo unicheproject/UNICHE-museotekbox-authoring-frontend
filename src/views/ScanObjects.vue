@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search } from 'lucide-vue-next'
+import { ScanLine } from 'lucide-vue-next'
 import {
   KIND_LABEL,
   SCAN_OBJECT_KINDS,
@@ -21,6 +21,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, type SelectOption } from '@/components/ui/select'
+import { SearchInput } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/page-header'
 import { Pagination } from '@/components/ui/pagination'
 import { FormDialog } from '@/components/ui/dialog'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -93,7 +95,7 @@ const columns: DataTableColumn<ScanObjectDto>[] = [
   { key: 'kind', label: 'Kind', sortable: true },
   { key: 'type', label: 'Type', sortable: true, headClass: 'w-24' },
   { key: 'rfidTag', label: 'RFID tag', sortable: true },
-  { key: 'reusable', label: 'Reusable', sortable: true, headClass: 'w-28' },
+  { key: 'reusable', label: 'Reusable', sortable: true, align: 'right', headClass: 'w-28' },
 ]
 
 // ── Create ──
@@ -117,16 +119,9 @@ async function submitCreate() {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold">Scan objects</h1>
-        <p class="text-sm text-muted-foreground">
-          The physical objects a museotekBox recognises: cards, printed images, 3D prints and
-          drafts.
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
+  <div>
+    <PageHeader title="Scan objects">
+      <template #actions>
         <Select
           v-if="showPicker"
           v-model="orgId"
@@ -134,74 +129,68 @@ async function submitCreate() {
           class="w-52"
           aria-label="Organisation"
         />
-        <Button variant="gradient" :disabled="!orgId" @click="startCreate">New scan object</Button>
-      </div>
-    </div>
+        <Button variant="gradient" size="sm" :disabled="!orgId" @click="startCreate">New scan object</Button>
+      </template>
+    </PageHeader>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <label class="relative min-w-56 flex-1">
-        <span class="sr-only">Search scan objects by name or RFID tag</span>
-        <Search
-          class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
+    <div class="space-y-6">
+      <div class="flex flex-wrap items-center gap-3">
+        <SearchInput
           v-model="list.search.value"
-          type="search"
+          label="Search scan objects by name or RFID tag"
           placeholder="Search by name or tag…"
-          class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-      </label>
-      <Select v-model="kindFilter" :options="kindOptions" class="w-44" aria-label="Filter by kind" />
-      <Select v-model="typeFilter" :options="typeOptions" class="w-36" aria-label="Filter by type" />
+        <Select v-model="kindFilter" :options="kindOptions" class="w-44" aria-label="Filter by kind" />
+        <Select v-model="typeFilter" :options="typeOptions" class="w-36" aria-label="Filter by type" />
+      </div>
+
+      <DataTable
+        :columns="columns"
+        :rows="list.rows.value"
+        :row-key="(row) => String(row.id)"
+        :sort-key="list.sortKey.value"
+        :sort-direction="list.sortDirection.value"
+        :loading="pending"
+        :error="error"
+        clickable
+        empty-title="No scan objects"
+        :empty-icon="ScanLine"
+        @sort="list.toggleSort"
+        @row-click="(row) => router.push(`/scan-objects/${orgId}/${row.id}`)"
+      >
+        <template #cell-kind="{ row }">{{ kindLabel(row) }}</template>
+        <template #cell-type="{ row }">
+          <span v-if="row.scanObjectTypeId !== null">{{ row.scanObjectTypeId }}</span>
+          <span v-else class="text-muted-foreground">—</span>
+        </template>
+        <template #cell-rfidTag="{ row }">
+          <span v-if="row.rfidTag" class="font-mono text-xs">{{ row.rfidTag }}</span>
+          <span v-else class="text-muted-foreground">Not tagged</span>
+        </template>
+        <template #cell-reusable="{ row }">
+          <Badge :variant="row.reusable ? 'success' : 'neutral'" dot>
+            {{ row.reusable ? 'Yes' : 'No' }}
+          </Badge>
+        </template>
+      </DataTable>
+
+      <Pagination
+        v-model:page="list.page.value"
+        :page-size="list.pageSize.value"
+        :total="list.total.value"
+      />
+
+      <FormDialog
+        v-model:open="createOpen"
+        title="New scan object"
+        submit-label="Create"
+        :busy="create.loading.value"
+        :error="create.error.value"
+        :submit-disabled="!scanObjectFormComplete(form)"
+        @submit="submitCreate"
+      >
+          <ScanObjectFormFields v-model="form" :field-errors="create.fieldErrors.value" show-rfid />
+      </FormDialog>
     </div>
-
-    <DataTable
-      :columns="columns"
-      :rows="list.rows.value"
-      :row-key="(row) => String(row.id)"
-      :sort-key="list.sortKey.value"
-      :sort-direction="list.sortDirection.value"
-      :loading="pending"
-      :error="error"
-      clickable
-      empty-title="No scan objects match your filters"
-      empty-hint="Create one, or clear the search and filters above."
-      @sort="list.toggleSort"
-      @row-click="(row) => router.push(`/scan-objects/${orgId}/${row.id}`)"
-    >
-      <template #cell-kind="{ row }">{{ kindLabel(row) }}</template>
-      <template #cell-type="{ row }">
-        <span v-if="row.scanObjectTypeId !== null">{{ row.scanObjectTypeId }}</span>
-        <span v-else class="text-muted-foreground">—</span>
-      </template>
-      <template #cell-rfidTag="{ row }">
-        <span v-if="row.rfidTag" class="font-mono text-xs">{{ row.rfidTag }}</span>
-        <span v-else class="text-muted-foreground">Not tagged</span>
-      </template>
-      <template #cell-reusable="{ row }">
-        <Badge :variant="row.reusable ? 'success' : 'neutral'">
-          {{ row.reusable ? 'Reusable' : 'Single use' }}
-        </Badge>
-      </template>
-    </DataTable>
-
-    <Pagination
-      v-model:page="list.page.value"
-      :page-size="list.pageSize.value"
-      :total="list.total.value"
-    />
-
-    <FormDialog
-      v-model:open="createOpen"
-      title="New scan object"
-      description="The fields below follow the kind you choose."
-      submit-label="Create"
-      :busy="create.loading.value"
-      :error="create.error.value"
-      :submit-disabled="!scanObjectFormComplete(form)"
-      @submit="submitCreate"
-    >
-      <ScanObjectFormFields v-model="form" :field-errors="create.fieldErrors.value" show-rfid />
-    </FormDialog>
   </div>
 </template>

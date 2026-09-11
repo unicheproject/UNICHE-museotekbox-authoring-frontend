@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/ui/page-header'
 
 /**
  * Account and authorization detail. This lived on the dashboard while proving out authentication
@@ -46,13 +47,8 @@ onMounted(() => authzStore.load())
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold">Account</h1>
-      <p class="text-sm text-muted-foreground">
-        Who you are signed in as, and what that lets you do.
-      </p>
-    </div>
+  <div>
+    <PageHeader title="Account" />
 
     <div class="grid gap-4 lg:grid-cols-2">
       <Card>
@@ -141,11 +137,6 @@ onMounted(() => authzStore.load())
               </ul>
               <p v-else class="text-muted-foreground">None</p>
             </div>
-
-            <p class="border-t pt-3 text-xs text-muted-foreground">
-              Permissions are re-checked on the server for every action; what you see here is only
-              a mirror of them.
-            </p>
           </template>
         </CardContent>
       </Card>

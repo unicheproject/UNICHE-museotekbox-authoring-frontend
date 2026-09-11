@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Nfc } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { Nfc } from 'lucide-vue-next'
 import {
   KIND_LABEL,
   deleteScanObject,
@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FormField } from '@/components/ui/form'
@@ -124,133 +125,126 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <RouterLink
-      to="/scan-objects"
-      class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-overline text-muted-foreground transition-colors hover:text-foreground"
+  <div>
+    <PageHeader
+      :title="object?.name ?? 'Scan object'"
+      back-label="Scan objects"
+      back-to="/scan-objects"
     >
-      <ArrowLeft class="h-3.5 w-3.5" />
-      Scan objects
-    </RouterLink>
+      <template v-if="object" #meta>
+        <Badge variant="purple">{{ kindName }}</Badge>
+        <Badge :variant="object.reusable ? 'success' : 'neutral'" dot>
+          {{ object.reusable ? 'Reusable' : 'Single use' }}
+        </Badge>
+      </template>
+      <template v-if="object" #actions>
+        <Button variant="outline" size="sm" :disabled="!kind" @click="startEdit">Edit</Button>
+      </template>
+    </PageHeader>
 
-    <Alert v-if="error" variant="error" title="Couldn't load this scan object">{{ error }}</Alert>
+    <div class="space-y-6">
+      <Alert v-if="error" variant="error" title="Couldn't load this scan object">{{ error }}</Alert>
 
-    <Card v-else-if="pending">
-      <CardHeader><Skeleton class="h-6 w-56" /></CardHeader>
-      <CardContent class="space-y-2">
-        <Skeleton class="h-4 w-64" />
-        <Skeleton class="h-4 w-40" />
-      </CardContent>
-    </Card>
+      <Card v-else-if="pending">
+        <CardHeader><Skeleton class="h-6 w-56" /></CardHeader>
+        <CardContent class="space-y-2">
+          <Skeleton class="h-4 w-64" />
+          <Skeleton class="h-4 w-40" />
+        </CardContent>
+      </Card>
 
-    <template v-else-if="object">
-      <Alert v-if="saved" variant="success" dismissible @dismiss="saved = null">{{ saved }}</Alert>
+      <template v-else-if="object">
+        <Alert v-if="saved" variant="success" dismissible @dismiss="saved = null">{{ saved }}</Alert>
 
-      <Alert v-if="!kind" variant="warning" title="Unrecognised kind">
-        The backend reports this object's kind as “{{ object.kind }}”, which this app does not know
-        how to edit. Editing and RFID changes are disabled to avoid writing it to the wrong
-        endpoint.
-      </Alert>
+        <Alert v-if="!kind" variant="warning" title="Unrecognised kind">
+          The backend reports this object's kind as “{{ object.kind }}”, which this app does not know
+          how to edit. Editing and RFID changes are disabled to avoid writing it to the wrong
+          endpoint.
+        </Alert>
 
-      <Card>
-        <CardHeader>
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="space-y-2">
-              <CardTitle>{{ object.name }}</CardTitle>
-              <div class="flex flex-wrap items-center gap-2">
-                <Badge variant="purple">{{ kindName }}</Badge>
-                <Badge :variant="object.reusable ? 'success' : 'neutral'">
-                  {{ object.reusable ? 'Reusable' : 'Single use' }}
-                </Badge>
+        <Card>
+          <CardContent class="p-6">
+            <dl class="grid gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                  Scan object type
+                </dt>
+                <dd class="mt-1">
+                  <span v-if="object.scanObjectTypeId !== null">Type {{ object.scanObjectTypeId }}</span>
+                  <span v-else class="text-muted-foreground">None</span>
+                </dd>
               </div>
-            </div>
-            <Button variant="outline" size="sm" :disabled="!kind" @click="startEdit">Edit</Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <dl class="grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
-                Scan object type
-              </dt>
-              <dd class="mt-1">
-                <span v-if="object.scanObjectTypeId !== null">Type {{ object.scanObjectTypeId }}</span>
-                <span v-else class="text-muted-foreground">None</span>
-              </dd>
-            </div>
-            <div v-if="object.colour">
-              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
-                Colour
-              </dt>
-              <dd class="mt-1">{{ object.colour }}</dd>
-            </div>
-            <div v-if="object.imageUrl" class="sm:col-span-2">
-              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
-                Image reference
-              </dt>
-              <dd class="mt-1 break-all font-mono text-xs text-muted-foreground">
-                {{ object.imageUrl }}
-              </dd>
-            </div>
-            <div v-if="object.modelRef" class="sm:col-span-2">
-              <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
-                Model reference
-              </dt>
-              <dd class="mt-1 break-all font-mono text-xs text-muted-foreground">
-                {{ object.modelRef }}
-              </dd>
-            </div>
-          </dl>
-        </CardContent>
-      </Card>
+              <div v-if="object.colour">
+                <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                  Colour
+                </dt>
+                <dd class="mt-1">{{ object.colour }}</dd>
+              </div>
+              <div v-if="object.imageUrl" class="sm:col-span-2">
+                <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                  Image reference
+                </dt>
+                <dd class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                  {{ object.imageUrl }}
+                </dd>
+              </div>
+              <div v-if="object.modelRef" class="sm:col-span-2">
+                <dt class="text-xs font-bold uppercase tracking-overline text-muted-foreground">
+                  Model reference
+                </dt>
+                <dd class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                  {{ object.modelRef }}
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader class="pb-3"><CardTitle class="text-base">RFID tag</CardTitle></CardHeader>
-        <CardContent class="flex flex-wrap items-center justify-between gap-3">
-          <p v-if="object.rfidTag" class="text-sm">
-            Bound to <span class="font-mono font-bold">{{ object.rfidTag }}</span>
-          </p>
-          <p v-else class="text-sm text-muted-foreground">No tag is bound to this object.</p>
-          <Button variant="secondary" size="sm" :disabled="!kind" @click="startRfid">
-            <Nfc class="h-3.5 w-3.5" />
-            {{ object.rfidTag ? 'Change or unbind' : 'Bind a tag' }}
-          </Button>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader class="pb-3"><CardTitle class="text-base">RFID tag</CardTitle></CardHeader>
+          <CardContent class="flex flex-wrap items-center justify-between gap-3">
+            <p v-if="object.rfidTag" class="text-sm">
+              Bound to <span class="font-mono font-bold">{{ object.rfidTag }}</span>
+            </p>
+            <p v-else class="text-sm text-muted-foreground">No tag is bound to this object.</p>
+            <Button variant="secondary" size="sm" :disabled="!kind" @click="startRfid">
+              <Nfc class="h-3.5 w-3.5" />
+              {{ object.rfidTag ? 'Change or unbind' : 'Bind a tag' }}
+            </Button>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader class="pb-3"><CardTitle class="text-base">Danger zone</CardTitle></CardHeader>
-        <CardContent class="space-y-3">
-          <p class="text-sm text-muted-foreground">
-            Deleting a scan object cannot be undone from this app.
-          </p>
-          <Button variant="destructive" @click="deleteOpen = true">Delete scan object</Button>
-        </CardContent>
-      </Card>
-    </template>
+        <Card>
+          <CardHeader class="pb-3"><CardTitle class="text-base">Danger zone</CardTitle></CardHeader>
+          <CardContent class="space-y-3">
+            <p class="text-sm text-muted-foreground">
+              Deleting a scan object cannot be undone from this app.
+            </p>
+            <Button variant="destructive" @click="deleteOpen = true">Delete scan object</Button>
+          </CardContent>
+        </Card>
+      </template>
 
-    <FormDialog
-      v-model:open="editOpen"
-      title="Edit scan object"
-      description="The kind cannot be changed — each kind is a separate record on the backend."
-      submit-label="Save changes"
-      :busy="update.loading.value"
-      :error="update.error.value"
-      :submit-disabled="!form || !scanObjectFormComplete(form)"
-      @submit="submitEdit"
-    >
-      <ScanObjectFormFields
-        v-if="form"
-        v-model="form"
-        :field-errors="update.fieldErrors.value"
-        kind-locked
+      <FormDialog
+        v-model:open="editOpen"
+        title="Edit scan object"
+        submit-label="Save changes"
+        :busy="update.loading.value"
+        :error="update.error.value"
+        :submit-disabled="!form || !scanObjectFormComplete(form)"
+        @submit="submitEdit"
+      >
+        <ScanObjectFormFields
+          v-if="form"
+          v-model="form"
+          :field-errors="update.fieldErrors.value"
+          kind-locked
       />
     </FormDialog>
 
     <FormDialog
       v-model:open="rfidOpen"
       title="RFID tag"
-      description="Enter the tag read from the physical object."
       submit-label="Bind tag"
       :busy="rfid.loading.value"
       :error="rfid.error.value"
@@ -292,7 +286,8 @@ async function confirmDelete() {
       description="It will be removed from the organisation. This cannot be undone here."
       :busy="remove.loading.value"
       :error="remove.error.value"
-      @confirm="confirmDelete"
-    />
+        @confirm="confirmDelete"
+      />
+    </div>
   </div>
 </template>

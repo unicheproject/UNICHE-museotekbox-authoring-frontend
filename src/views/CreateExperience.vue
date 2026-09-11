@@ -2,15 +2,16 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { ArrowLeft } from 'lucide-vue-next'
 import { useAuthzStore } from '@/stores/authz'
 import { createProject } from '@/api/museotekBox'
 import { useOrgNames } from '@/lib/useOrgNames'
 import { useMutation } from '@/lib/useQuery'
 import { slugify } from '@/lib/slug'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
 import { Select, type SelectOption } from '@/components/ui/select'
 import { Alert } from '@/components/ui/alert'
 import { FormField } from '@/components/ui/form'
@@ -56,27 +57,15 @@ async function submit() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-lg space-y-6">
-    <div>
-      <RouterLink
-        to="/experiences"
-        class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-overline text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft class="h-3.5 w-3.5" />
-        Experiences
-      </RouterLink>
-      <h1 class="mt-2 text-2xl font-bold">New Experience</h1>
-    </div>
+  <div class="mx-auto max-w-lg">
+    <PageHeader title="New Experience" back-label="Experiences" back-to="/experiences" />
 
     <Card v-if="!canCreate">
-      <CardContent class="pt-6 text-sm text-muted-foreground">
-        You don't manage any organisation, so you can't create an experience yet.
-      </CardContent>
+      <EmptyState title="You don't manage any organisation" />
     </Card>
 
     <Card v-else>
-      <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-      <CardContent>
+      <CardContent class="p-6">
         <form class="space-y-5" novalidate @submit.prevent="submit">
           <Alert v-if="create.error.value" variant="error">{{ create.error.value }}</Alert>
 
@@ -115,14 +104,21 @@ async function submit() {
             </template>
           </FormField>
 
-          <Button
-            type="submit"
-            variant="gradient"
-            class="w-full"
-            :disabled="create.loading.value || !name || !slug || !orgId"
-          >
-            {{ create.loading.value ? 'Creating…' : 'Create experience' }}
-          </Button>
+          <div class="flex justify-end gap-2 border-t border-border pt-5">
+            <RouterLink
+              to="/experiences"
+              :class="buttonVariants({ variant: 'outline' })"
+            >
+              Cancel
+            </RouterLink>
+            <Button
+              type="submit"
+              variant="gradient"
+              :disabled="create.loading.value || !name || !slug || !orgId"
+            >
+              {{ create.loading.value ? 'Creating…' : 'Create experience' }}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
