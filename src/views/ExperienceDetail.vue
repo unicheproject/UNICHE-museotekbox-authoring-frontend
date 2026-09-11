@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { useAuthzStore } from '@/stores/authz'
 import { deleteProject, getProject, updateProject } from '@/api/museotekBox'
@@ -18,6 +18,17 @@ import { ConfirmDialog, FormDialog } from '@/components/ui/dialog'
 
 const route = useRoute()
 const router = useRouter()
+
+// This screen is reached both from the Experiences list and from the Dashboard, so the back link
+// follows the history entry the user actually arrived from instead of always going to the list.
+// Captured once at setup: the component is recreated on every navigation here.
+const previousPath = (router.options.history.state.back as string | undefined) ?? null
+const backLabel = previousPath === '/' ? 'Dashboard' : 'Experiences'
+
+function goBack() {
+  if (previousPath) router.back()
+  else router.push('/experiences')
+}
 const authzStore = useAuthzStore()
 const { names: orgNames, resolve: resolveOrgNames } = useOrgNames()
 
@@ -71,13 +82,14 @@ onMounted(() => authzStore.load())
 
 <template>
   <div class="space-y-6">
-    <RouterLink
-      to="/experiences"
+    <button
+      type="button"
       class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-overline text-muted-foreground transition-colors hover:text-foreground"
+      @click="goBack"
     >
       <ArrowLeft class="h-3.5 w-3.5" />
-      Experiences
-    </RouterLink>
+      {{ backLabel }}
+    </button>
 
     <Alert v-if="error" variant="error" title="Couldn't load this experience">{{ error }}</Alert>
 
