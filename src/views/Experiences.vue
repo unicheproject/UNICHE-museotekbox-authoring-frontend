@@ -35,7 +35,9 @@ const orgIds = computed(() => {
 const canCreate = computed(
   () => context.value?.platformAdmin || (context.value?.managedOrganisations.length ?? 0) > 0,
 )
-const canSeeDeleted = computed(() => context.value?.platformAdmin === true)
+const canSeeDeleted = computed(
+  () => context.value?.platformAdmin === true || (context.value?.managedOrganisations.length ?? 0) > 0,
+)
 
 // There is no cross-organisation projects endpoint, so the list is the union of one call per
 // organisation. The query key includes the ids, so it re-fetches when the user's orgs change.
