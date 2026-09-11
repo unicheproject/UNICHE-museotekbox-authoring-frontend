@@ -44,16 +44,17 @@ export function createAppRouter() {
     ],
   })
 
-  // Guard: silent SSO is attempted once at startup (main.ts). If there is still no session,
-  // non-public routes bounce the user to the IdP login.
+  // Guard: silent SSO is attempted once at startup (main.ts). If there is still no session, the
+  // user lands on our own /login screen rather than being thrown straight at the IdP — the jump to
+  // Keycloak happens only when they press the button there. The route they were heading for is
+  // carried in ?redirect so the login can send them back to it.
   router.beforeEach((to) => {
     const authStore = useAuthStore()
     if (to.meta.public) {
       return true
     }
     if (!authStore.authenticated) {
-      authStore.login(to.fullPath)
-      return false
+      return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
     }
     return true
   })

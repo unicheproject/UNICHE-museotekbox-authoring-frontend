@@ -20,7 +20,7 @@ export const buttonVariants = cva(
         default: 'bg-brand-deep text-white shadow-xs hover:bg-[#3a1470] hover:-translate-y-px',
         /** Brand gradient — main CTA only, at most one per screen. */
         gradient:
-          'bg-grad-brand text-white shadow-cta [text-shadow:0_1px_3px_rgba(76,29,139,0.45)] hover:-translate-y-px hover:shadow-cta-hover',
+          'bg-grad-brand text-white shadow-cta [text-shadow:0_1px_3px_rgba(76,29,139,0.45)] hover:-translate-y-px hover:shadow-cta-hover disabled:!text-white',
         outline: 'border-2 border-brand-deep bg-transparent text-brand-deep hover:bg-secondary',
         ghost: 'border-2 border-transparent bg-transparent text-brand-purple hover:bg-secondary',
         /** Muted — secondary actions inside content. */
