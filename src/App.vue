@@ -63,15 +63,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 // Styleguide type scale, "UI / Nav": text-sm · 600.
 const navItem =
   'flex items-center gap-3 rounded-sm px-3.5 py-2.5 text-sm transition-colors duration-150'
-const navIdle = 'font-semibold text-white/45 hover:bg-white/5 hover:text-white/70'
-const navActive = 'bg-white/10 font-bold text-white'
+const navIdle = 'font-semibold text-secondary-foreground hover:bg-surface-2 hover:text-foreground'
+const navActive = 'bg-brand-deep/[0.08] font-bold text-brand-deep'
 </script>
 
 <template>
-  <!-- Unauthenticated (the Login screen) gets the bare canvas: no sidebar to navigate yet. -->
-  <div v-if="!authenticated" class="flex min-h-screen items-center justify-center bg-background p-4">
-    <RouterView />
-  </div>
+  <!-- Unauthenticated: the landing page draws its own full-bleed hero and footer, so the shell
+       hands it the whole viewport rather than centring it in a padded box. -->
+  <RouterView v-if="!authenticated" />
 
   <div v-else class="flex min-h-screen bg-background">
     <!-- Drawer backdrop: only ever visible below `lg`, where the sidebar overlays the content. -->
@@ -85,14 +84,14 @@ const navActive = 'bg-white/10 font-bold text-white'
          540px-tall fake browser frame, i.e. at reduced scale. The styleguide's own type scale puts
          nav labels at text-sm/600, which needs the extra width. -->
     <aside
-      class="fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 flex-col bg-brand-deep transition-transform duration-200 lg:sticky lg:bottom-auto lg:top-0 lg:z-auto lg:h-screen lg:translate-x-0"
+      class="fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 flex-col border-r border-border bg-background transition-transform duration-200 lg:sticky lg:bottom-auto lg:top-0 lg:z-auto lg:h-screen lg:translate-x-0"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div class="border-b border-white/[0.08] px-5 pb-[18px] pt-6">
+      <div class="border-b border-border px-5 pb-[18px] pt-6">
         <div class="flex items-center gap-2.5">
-          <img src="/museotekbox_mark.png" alt="" class="h-8 w-8 object-contain" />
-          <div class="text-[17px] font-extrabold tracking-[0.02em] text-white">
-            museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
+          <img src="/museotekbox_logo_no_background.png" alt="" class="h-9 w-9 object-contain" />
+          <div class="text-[17px] font-extrabold tracking-[0.02em] text-brand-deep">
+            Museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
           </div>
         </div>
       </div>
@@ -132,23 +131,25 @@ const navActive = 'bg-white/10 font-bold text-white'
     <div class="flex min-w-0 flex-1 flex-col">
       <!-- Mobile-only bar: the drawer's only way in, plus the brand mark the sidebar would show. -->
       <header
-        class="sticky top-0 z-20 flex items-center gap-3 border-b border-white/[0.08] bg-brand-deep px-4 py-3 lg:hidden"
+        class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background px-4 py-3 lg:hidden"
       >
         <button
-          class="rounded-sm p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
+          class="rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
           aria-label="Open navigation"
           :aria-expanded="sidebarOpen"
           @click="sidebarOpen = true"
         >
           <Menu class="h-5 w-5" />
         </button>
-        <img src="/museotekbox_mark.png" alt="" class="h-7 w-7 object-contain" />
-        <div class="text-[15px] font-extrabold tracking-[0.02em] text-white">
-          museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
+        <img src="/museotekbox_logo_no_background.png" alt="" class="h-8 w-8 object-contain" />
+        <div class="text-[15px] font-extrabold tracking-[0.02em] text-brand-deep">
+          Museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
         </div>
       </header>
 
-      <main class="flex-1 bg-surface px-4 py-5 sm:px-6 lg:px-7 lg:py-6">
+      <!-- Grey canvas, white cards. Every screen was previously white on white separated only by
+           a hairline, which is what made the lists read as unfinished. -->
+      <main class="flex-1 bg-surface-2 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <!-- One width cap for every screen, so the app does not read as two different layouts on a
              wide monitor (the dashboard used to cap itself while the lists ran edge to edge). -->
         <div class="mx-auto w-full max-w-[1180px]">

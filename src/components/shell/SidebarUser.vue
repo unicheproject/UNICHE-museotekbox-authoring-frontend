@@ -58,26 +58,26 @@ const item =
 </script>
 
 <template>
-  <div ref="root" class="relative border-t border-white/[0.08] px-2.5 py-3">
+  <div ref="root" class="relative border-t border-border px-2.5 py-3">
     <button
       type="button"
       aria-haspopup="menu"
       :aria-expanded="open"
-      class="flex w-full items-center gap-3 rounded-sm px-1.5 py-1.5 text-left transition-colors hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
-      :class="open && 'bg-white/10'"
+      class="flex w-full items-center gap-3 rounded-sm px-1.5 py-1.5 text-left transition-colors hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+      :class="open && 'bg-surface-2'"
       @click="open = !open"
     >
       <span
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-purple text-[11px] font-extrabold text-white"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[11px] font-extrabold text-white"
       >
         {{ props.initials }}
       </span>
       <span class="min-w-0 flex-1">
-        <span class="block truncate text-xs font-bold text-white">{{ props.name }}</span>
-        <span class="block truncate text-[11px] text-white/40">{{ props.organisation }}</span>
+        <span class="block truncate text-xs font-bold text-foreground">{{ props.name }}</span>
+        <span class="block truncate text-[11px] text-muted-foreground">{{ props.organisation }}</span>
       </span>
       <ChevronUp
-        class="h-4 w-4 shrink-0 text-white/40 transition-transform duration-150"
+        class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150"
         :class="open ? 'rotate-0' : 'rotate-180'"
       />
     </button>
