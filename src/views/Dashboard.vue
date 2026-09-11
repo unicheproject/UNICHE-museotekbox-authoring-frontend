@@ -12,7 +12,7 @@ import { buttonVariants } from '@/components/ui/button'
 const authStore = useAuthStore()
 const authzStore = useAuthzStore()
 const { profile } = storeToRefs(authStore)
-const { context, loading: authzLoading } = storeToRefs(authzStore)
+const { context } = storeToRefs(authzStore)
 const { names: orgNames, resolve: resolveOrgNames } = useOrgNames()
 
 const experiences = ref<ProjectDto[]>([])
@@ -36,19 +36,6 @@ const roleByProject = computed(() =>
 )
 
 const firstName = computed(() => profile.value?.name?.split(' ')[0] ?? profile.value?.username ?? '')
-
-const accessLevel = computed(() => {
-  if (!context.value) return '—'
-  if (context.value.platformAdmin) return 'Platform admin'
-  return context.value.managedOrganisations.length ? 'Org manager' : 'Contributor'
-})
-
-const subtitle = computed(() => {
-  if (authzLoading.value || loading.value) return 'Resolving your authorization…'
-  const n = experiences.value.length
-  const m = orgIds.value.length
-  return `${n} ${n === 1 ? 'experience' : 'experiences'} across ${m} ${m === 1 ? 'organisation' : 'organisations'}`
-})
 
 /**
  * ProjectDto carries no created/updated timestamp, so there is nothing to sort "recent" by — the
@@ -100,63 +87,11 @@ onMounted(load)
 <template>
   <div>
     <!-- Top row -->
-    <header class="mb-[22px] flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <p class="overline mb-1 text-brand-purple">Authoring Dashboard</p>
-        <h1 class="text-xl font-extrabold text-foreground">
-          Welcome back<span v-if="firstName">, {{ firstName }}</span>
-        </h1>
-        <p class="text-[13px] font-light text-muted-foreground">{{ subtitle }}</p>
-      </div>
-      <!-- The brand gradient is reserved for the single main CTA on a screen. -->
-      <RouterLink
-        v-if="canCreate"
-        to="/experiences/new"
-        :class="buttonVariants({ variant: 'gradient', size: 'sm' })"
-      >
-        + New Experience
-      </RouterLink>
+    <header class="mb-[22px]">
+      <h1 class="text-xl font-extrabold text-foreground">
+        Welcome<span v-if="firstName">, {{ firstName }}</span>
+      </h1>
     </header>
-
-    <!-- Stats. These are the real counts from the authorization context; the backend exposes no
-         analytics endpoints, so no play/scoring tiles are shown. -->
-    <div class="mb-[22px] grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
-        <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.09em] text-muted-foreground">
-          Experiences
-        </p>
-        <p class="text-2xl font-extrabold leading-none tracking-[-0.02em] text-brand-deep">
-          {{ experiences.length }}
-        </p>
-        <p class="mt-1.5 text-xs font-semibold text-muted-foreground">
-          {{ context?.projectMemberships.length ?? 0 }} with a direct role
-        </p>
-      </div>
-
-      <div class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
-        <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.09em] text-muted-foreground">
-          Organisations
-        </p>
-        <p class="text-2xl font-extrabold leading-none tracking-[-0.02em] text-brand-deep">
-          {{ orgIds.length }}
-        </p>
-        <p class="mt-1.5 text-xs font-semibold text-muted-foreground">
-          {{ context?.managedOrganisations.length ?? 0 }} you manage
-        </p>
-      </div>
-
-      <div class="rounded-lg border border-border bg-card px-4 py-3.5 shadow-xs">
-        <p class="mb-2 text-[10px] font-bold uppercase tracking-[0.09em] text-muted-foreground">
-          Access level
-        </p>
-        <p class="text-2xl font-extrabold leading-none tracking-[-0.02em] text-brand-deep">
-          {{ accessLevel }}
-        </p>
-        <p class="mt-1.5 text-xs font-semibold text-muted-foreground">
-          Re-checked server-side on every action
-        </p>
-      </div>
-    </div>
 
     <!-- Experience list -->
     <div class="mb-3 flex items-baseline justify-between">
