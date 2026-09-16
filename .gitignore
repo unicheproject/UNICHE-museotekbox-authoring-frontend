@@ -13,3 +13,6 @@ dist/
 .vscode/
 .DS_Store
 *.log
+
+# Personal notes / reports (never committed)
+notes/
