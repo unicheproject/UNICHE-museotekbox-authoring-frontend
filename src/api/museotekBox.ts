@@ -114,6 +114,22 @@ export async function restoreProject(projectId: string): Promise<ProjectDto> {
 }
 
 /**
+ * Members of one experience, as returned by GET /projects/{id}/members. The backend builds this
+ * from accepted invitations, so there is an email and a role but no userId, and `invitedAt` is when
+ * the invitation was issued (ISO instant), not when it was accepted.
+ */
+export interface ProjectMemberDto {
+  email: string
+  role: string
+  invitedAt: string
+}
+
+export async function listProjectMembers(projectId: string): Promise<ProjectMemberDto[]> {
+  const res = await http.get<ProjectMemberDto[]>(`/projects/${projectId}/members`)
+  return res.data
+}
+
+/**
  * The backend's error envelope (web/error/ErrorEnvelope): a machine `code` (e.g. `NOT_FOUND`,
  * `VALIDATION_ERROR`, `DUPLICATE_RFID_TAG`), a human `message`, per-field or per-rule `details`,
  * and the `requestId` of the call for tracing it in the backend logs.
