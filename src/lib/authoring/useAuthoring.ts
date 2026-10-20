@@ -7,6 +7,7 @@ import {
   getProject,
   listScanObjectTypes,
   saveExperience,
+  updateProject,
   type ExperienceDto,
   type ProjectDto,
 } from '@/api/museotekBox'
@@ -61,6 +62,8 @@ export function useAuthoring(projectId: Ref<string>) {
   const saveError = ref<string | null>(null)
   /** A change is waiting to be saved, or being saved. */
   const pending = ref(false)
+  /** A new name is waiting to be saved, or being saved. */
+  const renaming = ref(false)
 
   let base: ExperienceDto | null = null
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -139,6 +142,35 @@ export function useAuthoring(projectId: Ref<string>) {
     }, SAVE_DELAY)
   }
 
+  /**
+   * The name belongs to the project, not to the experience document, so it is saved on its own,
+   * a moment after the last keystroke. An empty name is not sent: the project keeps its old one.
+   */
+  let renameTimer: ReturnType<typeof setTimeout> | null = null
+  async function saveName() {
+    renameTimer = null
+    const name = authoring.details.name.trim()
+    if (!project.value || !name || name === project.value.name) {
+      renaming.value = false
+      return
+    }
+    try {
+      project.value = await updateProject(project.value.id, { name })
+      saveError.value = null
+    } catch (e) {
+      saveError.value = describeError(e)
+    } finally {
+      if (!renameTimer) renaming.value = false
+    }
+  }
+
+  function rename(name: string) {
+    authoring.details.name = name
+    renaming.value = true
+    if (renameTimer) clearTimeout(renameTimer)
+    renameTimer = setTimeout(() => void saveName(), SAVE_DELAY)
+  }
+
   onUnmounted(() => {
     // Leaving the page must not lose the last change.
     if (timer) {
@@ -146,7 +178,11 @@ export function useAuthoring(projectId: Ref<string>) {
       timer = null
       void save()
     }
+    if (renameTimer) {
+      clearTimeout(renameTimer)
+      void saveName()
+    }
   })
 
-  return { authoring, project, loading, error, saveError, pending, load, commit }
+  return { authoring, project, loading, error, saveError, pending, renaming, load, commit, rename }
 }

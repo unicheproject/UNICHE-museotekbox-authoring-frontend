@@ -9,9 +9,9 @@ import DialogShell from './DialogShell.vue'
 import MediaPicker from './MediaPicker.vue'
 import SwatchRow from './SwatchRow.vue'
 
-/** The whole experience: where it plays, and the replies every activity uses. */
+/** The whole experience: its name, where it plays, and the replies every activity uses. */
 const props = defineProps<{ a: Authoring }>()
-const emit = defineEmits<{ close: []; change: []; advanced: []; delete: [] }>()
+const emit = defineEmits<{ close: []; change: []; rename: [name: string]; advanced: []; delete: [] }>()
 
 const out = computed(() => OUTPUTS[props.a.details.output])
 
@@ -24,6 +24,15 @@ function set(kind: ReplyKind, key: 'text' | 'color' | 'media' | 'audio' | 'boxVi
 <template>
   <DialogShell kicker="Whole experience" title="Settings" @close="emit('close')">
     <div class="space-y-6">
+      <section>
+        <div class="mb-2 text-[13px] font-extrabold">Name</div>
+        <input
+          :value="a.details.name"
+          aria-label="Name"
+          :class="[inputCls, a.details.name.trim() ? '' : 'border-warning']"
+          @input="emit('rename', ($event.target as HTMLInputElement).value)"
+        />
+      </section>
       <section>
         <div class="mb-2 text-[13px] font-extrabold">Where it plays</div>
         <p class="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2.5 text-[12.5px] text-secondary-foreground">

@@ -59,7 +59,7 @@ const route = useRoute()
 const router = useRouter()
 
 const projectId = computed(() => route.params.projectId as string)
-const { authoring: a, project, loading, error, saveError, pending, load, commit } = useAuthoring(projectId)
+const { authoring: a, project, loading, error, saveError, pending, renaming, load, commit, rename } = useAuthoring(projectId)
 
 const base = computed(() => `/experiences/${projectId.value}`)
 const isIsland = (k: string) => a.islands.some((x) => x.key === k)
@@ -205,7 +205,7 @@ async function loadPublished() {
 }
 
 /** Whether what is on the page has reached the backend. */
-const saving = computed(() => pending.value)
+const saving = computed(() => pending.value || renaming.value)
 
 /** The test run has its own address, over the page. */
 const testing = computed(() => route.name === 'experience-test')
@@ -467,6 +467,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :a="a"
         @close="closeDialog"
         @change="commit"
+        @rename="rename"
         @advanced="router.push(`${base}/advanced`)"
         @delete="() => { dlg = null; deleting = true }"
       />
