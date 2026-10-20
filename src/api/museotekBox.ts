@@ -113,11 +113,16 @@ export async function restoreProject(projectId: string): Promise<ProjectDto> {
   return res.data
 }
 
-/** The backend's error envelope (web/error/ErrorEnvelope): code + message + per-field details. */
-interface ErrorEnvelope {
+/**
+ * The backend's error envelope (web/error/ErrorEnvelope): a machine `code` (e.g. `NOT_FOUND`,
+ * `VALIDATION_ERROR`, `DUPLICATE_RFID_TAG`), a human `message`, per-field or per-rule `details`,
+ * and the `requestId` of the call for tracing it in the backend logs.
+ */
+export interface ErrorEnvelope {
   code?: string
   message?: string
   details?: string[]
+  requestId?: string | null
 }
 
 /** HTTP status of a failed request, or undefined if it never reached the backend. */
@@ -361,4 +366,246 @@ export interface MemberDto {
 export async function listMembers(orgId: string): Promise<MemberDto[]> {
   const res = await http.get<MemberDto[]>(`/organisations/${orgId}/members`)
   return res.data
+}
+
+// ─────────────────────────── Experience document ───────────────────────────
+//
+// An experience's content is ONE document: where it plays (output), the authoring screens' own
+// source (flow), the variables, and the scenes, each with its own blocks and rules.
+// GET /projects/{projectId}/experience reads it; PUT replaces it whole — the backend diffs the
+// document against what it has, deleting anything left out, updating what it knows by key and
+// inserting the rest, in one transaction.
+//
+// Writes are guarded by the document version: the PUT must carry `If-Match: "<version>"`. A stale
+// version answers 409 with the CURRENT document as its body (not an error envelope); an invalid
+// document answers 400 VALIDATION_ERROR with one line per problem in `details`.
+
+export type BlockType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'QUIZ' | 'BUTTON' | 'TRUE_FALSE'
+export const BLOCK_TYPES: BlockType[] = ['TEXT', 'IMAGE', 'VIDEO', 'QUIZ', 'BUTTON', 'TRUE_FALSE']
+
+/**
+ * Rule model v2: when (trigger) … if (condition) … do (effects, in order) … then (destination).
+ * Of the rules of a scene whose trigger matches, the first by position whose condition holds runs.
+ */
+export type TriggerType = 'SCAN' | 'SCAN_OTHER' | 'TIMER_ELAPSED' | 'VIDEO_ENDED' | 'SCENE_ENTERED' | 'SESSION_STARTED'
+export type DestinationType = 'GO_TO' | 'STAY' | 'END'
+export type ConditionType = 'VAR_CMP' | 'FLAG_IS'
+export type ConditionOp = 'GTE' | 'LTE' | 'GT' | 'LT' | 'EQ' | 'NEQ'
+export type EffectType = 'REPLY' | 'BOX_SCREEN' | 'BOX_AUDIO' | 'SET_NUMBER' | 'ADD_NUMBER' | 'SET_FLAG'
+export type VariableKind = 'NUMBER' | 'FLAG'
+/** Where the experience plays: chosen once, on the first save, and never changed afterwards. */
+export type ExperienceOutput = 'DISPLAY' | 'BOX'
+
+/** Any JSON value; a block's `content` is stored as-is in a jsonb column. */
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+
+/**
+ * Scene, block and rule keys are positive-integer strings with no leading zeros ("1", "27").
+ * Each kind is unique across the whole document — not per scene — and a NEW key must be at least
+ * the project's matching `next*Seq` counter. Use `createKeyAllocator` to mint them.
+ */
+export type ElementKey = string
+
+export interface BlockDto {
+  blockKey: ElementKey
+  type: BlockType
+  position: number
+  content: JsonValue
+}
+
+export interface TriggerDto {
+  type: TriggerType
+  /** SCAN only: the object type whose placing fires the rule. */
+  scanObjectTypeId?: number | null
+  /** TIMER_ELAPSED only, > 0. */
+  seconds?: number | null
+}
+
+/** VAR_CMP compares a NUMBER variable (`op`, integer `value`); FLAG_IS tests a FLAG ("true"/"false"). */
+export interface ConditionDto {
+  type: ConditionType
+  variable: string
+  op?: ConditionOp | null
+  value: string
+}
+
+/** Each type uses only some fields; values travel as strings, `amount` as a number. */
+export interface EffectDto {
+  type: EffectType
+  variable?: string | null
+  value?: string | null
+  amount?: number | null
+  color?: string | null
+  text?: string | null
+  media?: string | null
+  audio?: string | null
+  boxVideo?: string | null
+  url?: string | null
+}
+
+export interface DestinationDto {
+  type: DestinationType
+  /** GO_TO only: any scene of the document. */
+  targetSceneKey?: ElementKey | null
+}
+
+export interface RuleDto {
+  ruleKey: ElementKey
+  position: number
+  trigger: TriggerDto
+  condition: ConditionDto | null
+  effects: EffectDto[]
+  destination: DestinationDto
+}
+
+export interface SceneDto {
+  sceneKey: ElementKey
+  name: string
+  position: number
+  /** Exactly one scene of the document must be the start scene. */
+  isStart: boolean
+  /** The object type that starts the experience at this scene (a scan object type id). */
+  initCardTypeId: number | null
+  blocks: BlockDto[]
+  rules: RuleDto[]
+}
+
+/** A number or flag the experience keeps while a visitor plays; `initial` is "0", "true"… */
+export interface VariableDto {
+  key: string
+  kind: VariableKind
+  initial: string
+}
+
+/**
+ * The curator's own source for the experience (what the authoring screens built), stored as-is.
+ * The backend reads only `schemaVersion`.
+ */
+export interface FlowDto {
+  schemaVersion: number
+  content: { [key: string]: JsonValue }
+}
+
+export interface ExperienceDto {
+  projectId: string
+  /** Echo this back as If-Match on the next save. */
+  version: number
+  nextSceneSeq: number
+  nextBlockSeq: number
+  nextRuleSeq: number
+  /** Null until the first save. */
+  output: ExperienceOutput | null
+  /** Null until the first save. */
+  flow: FlowDto | null
+  variables: VariableDto[]
+  scenes: SceneDto[]
+}
+
+/** What a save sends: everything but the version (it travels in If-Match) and the counters. */
+export interface ExperienceWriteRequest {
+  output: ExperienceOutput
+  flow: FlowDto
+  variables: VariableDto[]
+  scenes: SceneDto[]
+}
+
+/**
+ * Normalises a scene off the wire. The Java record component is `isStart`; depending on how
+ * Jackson names a record's boolean `is…` accessor, the response can spell it `isStart` or `start`,
+ * so both are read. Requests always send `isStart`, which is what the backend binds.
+ */
+function sceneFromWire(raw: SceneDto & { start?: boolean }): SceneDto {
+  const { start, ...scene } = raw
+  return {
+    ...scene,
+    isStart: raw.isStart ?? start ?? false,
+    blocks: raw.blocks ?? [],
+    rules: raw.rules ?? [],
+  }
+}
+
+function experienceFromWire(raw: ExperienceDto): ExperienceDto {
+  return {
+    ...raw,
+    output: raw.output ?? null,
+    flow: raw.flow ?? null,
+    variables: raw.variables ?? [],
+    scenes: (raw.scenes ?? []).map(sceneFromWire),
+  }
+}
+
+/** The quoted entity tag the backend expects in If-Match for a given version. */
+export function versionTag(version: number): string {
+  return `"${version}"`
+}
+
+/** Read a project's whole experience document. A new project has `output` and `flow` null and `scenes: []`. */
+export async function getExperience(projectId: string): Promise<ExperienceDto> {
+  const res = await http.get<ExperienceDto>(`/projects/${projectId}/experience`)
+  return experienceFromWire(res.data)
+}
+
+/**
+ * Thrown by `saveExperience` when someone else saved first (409). Carries the document as it is
+ * now on the server, so the caller can show it or merge onto it and retry with its version.
+ */
+export class StaleExperienceError extends Error {
+  constructor(public readonly current: ExperienceDto) {
+    super('This experience was changed by someone else since it was opened.')
+    this.name = 'StaleExperienceError'
+  }
+}
+
+/**
+ * Replace a project's experience document. `version` is the one the edit was based on — the
+ * `version` of the last GET or save. Resolves to the saved document with its new version and
+ * advanced counters. Rejects with `StaleExperienceError` on 409; a 400 with the validator's
+ * messages is left as the axios error, which `describeError` turns into text.
+ */
+export async function saveExperience(
+  projectId: string,
+  version: number,
+  body: ExperienceWriteRequest,
+): Promise<ExperienceDto> {
+  try {
+    const res = await http.put<ExperienceDto>(`/projects/${projectId}/experience`, body, {
+      headers: { 'If-Match': versionTag(version) },
+    })
+    return experienceFromWire(res.data)
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 409 && error.response.data) {
+      throw new StaleExperienceError(experienceFromWire(error.response.data as ExperienceDto))
+    }
+    throw error
+  }
+}
+
+export interface KeyAllocator {
+  sceneKey(): ElementKey
+  blockKey(): ElementKey
+  ruleKey(): ElementKey
+}
+
+/**
+ * Mints fresh scene/block/rule keys for new elements, starting from the document's counters and
+ * never going below a key already in the document. Allocate from the document the edit is based
+ * on; after a save, make a new allocator from the returned document.
+ */
+export function createKeyAllocator(experience: ExperienceDto): KeyAllocator {
+  const highest = (keys: string[]) => keys.reduce((max, k) => Math.max(max, Number.parseInt(k, 10) || 0), 0)
+  const scenes = experience.scenes
+  let scene = Math.max(experience.nextSceneSeq, highest(scenes.map((s) => s.sceneKey)) + 1)
+  let block = Math.max(
+    experience.nextBlockSeq,
+    highest(scenes.flatMap((s) => s.blocks.map((b) => b.blockKey))) + 1,
+  )
+  let rule = Math.max(
+    experience.nextRuleSeq,
+    highest(scenes.flatMap((s) => s.rules.map((r) => r.ruleKey))) + 1,
+  )
+  return {
+    sceneKey: () => String(scene++),
+    blockKey: () => String(block++),
+    ruleKey: () => String(rule++),
+  }
 }
