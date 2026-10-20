@@ -609,3 +609,61 @@ export function createKeyAllocator(experience: ExperienceDto): KeyAllocator {
     ruleKey: () => String(rule++),
   }
 }
+
+// ─────────────────────────── Media library ───────────────────────────
+//
+// An organisation's pictures, videos and sounds, uploaded once and used in any of its experiences.
+// The experience document refers to an item by its id: a block's `content.mediaId`, and a reply's
+// `media` (IMAGE), `audio` (AUDIO), `boxVideo` (VIDEO) or a BOX_AUDIO effect's `url` (AUDIO). The
+// save is refused (400) for an id that is not in the org's library or is the wrong kind.
+
+export type MediaKind = 'IMAGE' | 'VIDEO' | 'AUDIO'
+
+/** The content types each kind accepts; anything else answers 415. */
+export const MEDIA_TYPES: Record<MediaKind, string[]> = {
+  IMAGE: ['image/png', 'image/jpeg', 'image/webp'],
+  VIDEO: ['video/mp4'],
+  AUDIO: ['audio/mpeg', 'audio/wav', 'audio/ogg'],
+}
+
+export interface MediaDto {
+  id: string
+  kind: MediaKind
+  /** The file's original name. */
+  name: string
+  contentType: string
+  sizeBytes: number
+  /** A path on the backend (context path included); needs the bearer token like every call. */
+  contentUrl: string
+  uploadedAt: string
+}
+
+/** Newest first; `kind` narrows the list to one kind. */
+export async function listMedia(orgId: string, kind?: MediaKind): Promise<MediaDto[]> {
+  const res = await http.get<MediaDto[]>(`/organisations/${orgId}/media`, { params: kind ? { kind } : undefined })
+  return res.data
+}
+
+/** Upload one file; `onProgress` gets 0–100. 413 if it is too large, 415 if its type isn't allowed. */
+export async function uploadMedia(orgId: string, file: File, onProgress?: (percent: number) => void): Promise<MediaDto> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await http.post<MediaDto>(`/organisations/${orgId}/media`, form, {
+    onUploadProgress: (e) => onProgress?.(e.total ? Math.round((e.loaded / e.total) * 100) : 0),
+  })
+  return res.data
+}
+
+/** 409 MEDIA_IN_USE while any experience still uses it. */
+export async function deleteMedia(orgId: string, mediaId: string): Promise<void> {
+  await http.delete(`/organisations/${orgId}/media/${mediaId}`)
+}
+
+/**
+ * The file itself, as a Blob. The content endpoint needs the bearer token, so the browser can't
+ * load it straight from an <img src>; callers turn the Blob into an object URL.
+ */
+export async function getMediaContent(orgId: string, mediaId: string): Promise<Blob> {
+  const res = await http.get<Blob>(`/organisations/${orgId}/media/${mediaId}/content`, { responseType: 'blob' })
+  return res.data
+}
