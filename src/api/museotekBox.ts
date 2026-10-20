@@ -667,3 +667,54 @@ export async function getMediaContent(orgId: string, mediaId: string): Promise<B
   const res = await http.get<Blob>(`/organisations/${orgId}/media/${mediaId}/content`, { responseType: 'blob' })
   return res.data
 }
+
+// ─────────────────────────── Comments ───────────────────────────
+//
+// Comments left on an experience, in threads with one level of replies. A thread's first comment
+// carries what it is about (a screen and a step of the flow, stored as given) and whether it is
+// resolved; replies hang under it.
+
+/** A reply, as shown under its thread. */
+export interface CommentDto {
+  id: string
+  body: string
+  authorName: string
+  createdAt: string
+}
+
+/** A thread: its first comment, what it is about, whether it is resolved, and its replies. */
+export interface CommentThreadDto extends CommentDto {
+  sceneKey: string | null
+  stepKey: string | null
+  resolved: boolean
+  resolvedBy: string | null
+  resolvedAt: string | null
+  replies: CommentDto[]
+}
+
+/** Open threads first, then resolved, each oldest first. */
+export async function listComments(projectId: string): Promise<CommentThreadDto[]> {
+  const res = await http.get<CommentThreadDto[]>(`/projects/${projectId}/comments`, { params: { status: 'all' } })
+  return res.data
+}
+
+/** Start a thread about a screen and a step. Body up to 2000 characters. */
+export async function addComment(
+  projectId: string,
+  body: { body: string; sceneKey: string | null; stepKey: string | null },
+): Promise<CommentThreadDto> {
+  const res = await http.post<CommentThreadDto>(`/projects/${projectId}/comments`, body)
+  return res.data
+}
+
+/** Reply to a thread's first comment. */
+export async function replyToComment(projectId: string, commentId: string, body: string): Promise<CommentDto> {
+  const res = await http.post<CommentDto>(`/projects/${projectId}/comments/${commentId}/replies`, { body })
+  return res.data
+}
+
+/** Resolve a thread, or reopen it with `false`. */
+export async function setCommentResolved(projectId: string, commentId: string, resolved: boolean): Promise<CommentThreadDto> {
+  const res = await http.patch<CommentThreadDto>(`/projects/${projectId}/comments/${commentId}`, { resolved })
+  return res.data
+}
