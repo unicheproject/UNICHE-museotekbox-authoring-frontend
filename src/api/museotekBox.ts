@@ -164,7 +164,7 @@ export const CARD_COLOURS: CardColour[] = ['RED', 'GREEN', 'YELLOW', 'WHITE']
 export interface ScanObjectDto {
   id: number
   orgId: string
-  /** References a scan object type. There is no endpoint to list types yet — see docs/BACKEND-GAPS.md. */
+  /** References a scan object type. The backend has no endpoint that lists or names these types. */
   scanObjectTypeId: number | null
   name: string
   rfidTag: string | null
@@ -295,6 +295,23 @@ export async function updateScanObject(
 
 export async function deleteScanObject(orgId: string, id: number): Promise<void> {
   await http.delete(`/organisations/${orgId}/scan-objects/${id}`)
+}
+
+// ─────────────────────────── Scan object types ───────────────────────────
+
+/**
+ * A kind of object the museum uses ("Red card", "Vase replica"). Rules and the start scene refer to
+ * a type, not to one physical object: any object of that type triggers them.
+ */
+export interface ScanObjectTypeDto {
+  id: number
+  orgId: string
+  name: string
+}
+
+export async function listScanObjectTypes(orgId: string): Promise<ScanObjectTypeDto[]> {
+  const res = await http.get<ScanObjectTypeDto[]>(`/organisations/${orgId}/scan-object-types`)
+  return res.data
 }
 
 // ─────────────────────────── Boxes ───────────────────────────
