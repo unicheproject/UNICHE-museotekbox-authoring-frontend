@@ -190,6 +190,9 @@ watch(sel, (now) => {
   if (drawer.value && drawerStep.value && drawerStep.value !== now) drawerStep.value = now
 })
 
+/** Whether what is on the page has reached the backend. */
+const saving = computed(() => pending.value)
+
 /** The test run has its own address, over the page. */
 const testing = computed(() => route.name === 'experience-test')
 const publishing = computed(() => route.name === 'experience-publish')
@@ -268,6 +271,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
             </button>
             <span class="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
               <AIcon :name="output.icon" cls="h-3.5 w-3.5" />Plays on {{ output.name }}
+            </span>
+            <span v-if="!saveError" class="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground" aria-live="polite">
+              <template v-if="saving">
+                <span class="h-3 w-3 animate-spin rounded-pill border-2 border-muted-foreground/40 border-t-muted-foreground" />Saving…
+              </template>
+              <template v-else><AIcon name="check" cls="h-3.5 w-3.5 text-success" />Saved</template>
             </span>
           </div>
         </div>
