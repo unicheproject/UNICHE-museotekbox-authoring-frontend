@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { isInfo, newInfo, newQuestion, or, questionGaps, type Authoring, type Cfg } from '@/lib/authoring/engine'
+import { branchLine, isInfo, newInfo, newQuestion, or, questionGaps, type Authoring, type Cfg } from '@/lib/authoring/engine'
 import AIcon from './AIcon.vue'
 import QuestionEditor from './QuestionEditor.vue'
 import SectionHead from './SectionHead.vue'
@@ -75,6 +75,9 @@ const addBtn =
             {{ isInfo(q) ? 'Information' : 'Question ' + numbers[i] }}
           </span>
           <span class="block truncate text-[13px] font-bold">{{ or(q.name, isInfo(q) ? 'New information' : 'New question') }}</span>
+          <span v-if="branchLine(a, qs, q)" class="mt-0.5 flex items-center gap-1 truncate text-[11.5px] font-bold text-brand-deep">
+            <AIcon name="route" cls="h-3.5 w-3.5 shrink-0" />{{ branchLine(a, qs, q) }}
+          </span>
         </span>
         <span
           v-if="questionGaps(a, q).length"

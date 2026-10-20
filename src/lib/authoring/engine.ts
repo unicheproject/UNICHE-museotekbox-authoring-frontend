@@ -347,6 +347,40 @@ export const usesScreen = (a: Authoring, q: Cfg | null | undefined) =>
 /** The object that answers a question: typed in directly, or the ticked answer's. */
 export const rightOf = (a: Authoring, q: Cfg | null | undefined): string =>
   usesScreen(a, q) ? ((q!.answers || [])[q!.right] || {}).scan || '' : (q && q.correct) || ''
+// ─────────────────────────── branches ───────────────────────────
+// On a ready-made screen each answer can lead somewhere of its own. Off by default: the right
+// answer goes on to the next item and every other scan leaves the question up.
+
+/** A quiz item's lasting id, for an answer to point at; given the first time one is needed. */
+export const itemId = (q: Cfg): string => (q.id ||= 'q' + Math.random().toString(36).slice(2, 10))
+/** Where an answer leads: 'next' (the item after it), 'end' (the result), or another item's id. */
+export const goOf = (q: Cfg, k: number): string => String(((q.answers || [])[k] || {}).go || 'next')
+/** The item an answer leads to, or null for the end of the quiz. A target since deleted is "next". */
+export function goTarget(qs: Cfg[], q: Cfg, go: string): Cfg | null {
+  if (go === 'end') return null
+  const to = go === 'next' ? -1 : qs.findIndex((o) => o.id === go)
+  if (to >= 0) return qs[to]
+  const n = qs.indexOf(q) + 1
+  return n < qs.length ? qs[n] : null
+}
+/** "Question 2", "Information": an item as the quiz numbers it. */
+export function itemLabel(qs: Cfg[], q: Cfg): string {
+  if (isInfo(q)) return 'Information'
+  return 'Question ' + questionsOnly(qs.slice(0, qs.indexOf(q) + 1)).length
+}
+/** "B → Question 1", for the quiz list: only the answers that leave the usual order. */
+export function branchLine(a: Authoring, qs: Cfg[], q: Cfg): string {
+  if (!q.branch || !usesScreen(a, q)) return ''
+  const usual = goTarget(qs, q, 'next')
+  return (q.answers || [])
+    .map((_: Cfg, k: number) => {
+      const t = goTarget(qs, q, goOf(q, k))
+      return t === usual ? '' : `${LETTERS[k]} → ${t ? itemLabel(qs, t) : 'End of the quiz'}`
+    })
+    .filter(Boolean)
+    .join(' · ')
+}
+
 /** Box-only has no video to wait for, so "when the video ends" falls back to time. */
 export const infoMoveOn = (a: Authoring, q: Cfg) => (q.moveOn === 'video' && !hasDisplay(a) ? 'time' : q.moveOn || 'time')
 
@@ -515,18 +549,36 @@ export const TEMPLATES: Template[] = [
       const id = (x: string) => ns + '-' + x
       const qs: Cfg[] = cfg.questions || []
       const next = (i: number) => (i + 1 < qs.length ? id('q' + (i + 1)) : id('result'))
+      /** The scene an answer of item i leads to. */
+      const leadsTo = (i: number, go: string) => {
+        const t = goTarget(qs, qs[i], go)
+        return t ? id('q' + qs.indexOf(t)) : id('result')
+      }
 
       // Everything that can be scanned on a question scene, in the order the engine reads it: the
       // right object, the clue, the named exceptions, then the catch-all. First match wins.
       const answerRules = (q: Cfg, i: number) => {
         const rules: Rule[] = []
         const R = (k: ReplyKind) => resolvedReply(cfg, q, k)
-        rules.push(
-          rule('Right answer', onScan(card(rightOf(a, q))), {
-            effects: [reply(R('correct')), addNum('correct', 1)],
-            destination: goTo(next(i)),
-          }),
-        )
+        if (q.branch && usesScreen(a, q))
+          // Every answer leads where the author said; right or not, it is scored and replied to.
+          (q.answers || []).forEach((ans: Cfg, k: number) => {
+            if (!ans.scan) return
+            const right = q.right === k
+            rules.push(
+              rule(`Answer ${LETTERS[k]}${ans.text ? ' · ' + ans.text : ''}`, onScan(card(ans.scan)), {
+                effects: right ? [reply(R('correct')), addNum('correct', 1)] : [reply(R('wrong')), addNum('wrong', 1)],
+                destination: goTo(leadsTo(i, goOf(q, k))),
+              }),
+            )
+          })
+        else
+          rules.push(
+            rule('Right answer', onScan(card(rightOf(a, q))), {
+              effects: [reply(R('correct')), addNum('correct', 1)],
+              destination: goTo(next(i)),
+            }),
+          )
         if (q.hint)
           rules.push(
             rule('They asked for a clue', onScan(card(q.hint)), {

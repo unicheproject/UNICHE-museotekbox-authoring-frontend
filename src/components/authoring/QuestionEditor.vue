@@ -20,6 +20,7 @@ import {
 import { inputCls } from '@/lib/authoring/html'
 import AField from './AField.vue'
 import AIcon from './AIcon.vue'
+import BranchFields from './BranchFields.vue'
 import CustomRows from './CustomRows.vue'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import ScreenFields from './ScreenFields.vue'
@@ -274,7 +275,7 @@ const specific = computed(
                 </template>
                 <template v-else>Tick the right answer above</template>
               </p>
-              <span class="mt-1 block text-[11.5px] text-muted-foreground">Placing it moves the visitor on to the next item.</span>
+              <span v-if="!q.branch" class="mt-1 block text-[11.5px] text-muted-foreground">Placing it moves the visitor on to the next item.</span>
             </div>
             <AField v-else label="The right object" help="Placing this moves the visitor on to the next question.">
               <TypeSelect
@@ -296,6 +297,8 @@ const specific = computed(
             >.
           </p>
         </div>
+
+        <BranchFields v-if="onScreen" :a="a" :qs="qs" :q="q" @change="emit('change')" />
 
         <details
           class="rounded-md border border-border"
