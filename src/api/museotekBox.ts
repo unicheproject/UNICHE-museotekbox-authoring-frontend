@@ -321,7 +321,7 @@ export interface BoxDto {
   orgId: string
   name: string
   serialNumber: string
-  /** Free-text on the backend; `boxOnline()` decides what counts as online. */
+  /** `ONLINE` or `OFFLINE` (the backend's BoxStatus enum); read it through `boxOnline()`. */
   status: string
   /** The experience the box is currently running, if any. */
   currentProjectId: string | null
@@ -345,6 +345,22 @@ export async function listBoxes(orgId: string): Promise<BoxDto[]> {
   return res.data
 }
 
+/** The experiences installed on a box. */
+export async function listBoxProjects(orgId: string, boxId: number): Promise<ProjectDto[]> {
+  const res = await http.get<ProjectDto[]>(`/organisations/${orgId}/boxes/${boxId}/projects`)
+  return res.data
+}
+
+/** Install an experience on a box (org managers only). */
+export async function assignProjectToBox(orgId: string, boxId: number, projectId: string): Promise<void> {
+  await http.put(`/organisations/${orgId}/boxes/${boxId}/projects/${projectId}`)
+}
+
+/** Take an experience off a box (org managers only). */
+export async function unassignProjectFromBox(orgId: string, boxId: number, projectId: string): Promise<void> {
+  await http.delete(`/organisations/${orgId}/boxes/${boxId}/projects/${projectId}`)
+}
+
 export async function getBox(orgId: string, boxId: number): Promise<BoxDto> {
   const res = await http.get<BoxDto>(`/organisations/${orgId}/boxes/${boxId}`)
   return res.data
@@ -356,7 +372,7 @@ export async function createBox(orgId: string, body: BoxRequest): Promise<BoxDto
 }
 
 /** Name and serial only: UpdateBoxRequest carries nothing else, so the running experience
- *  cannot be set from here yet (see docs/BACKEND-GAPS.md). */
+ *  cannot be set from here — the backend has no endpoint for it yet. */
 export async function updateBox(orgId: string, boxId: number, body: BoxRequest): Promise<BoxDto> {
   const res = await http.patch<BoxDto>(`/organisations/${orgId}/boxes/${boxId}`, body)
   return res.data
