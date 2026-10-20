@@ -28,6 +28,13 @@ export function createAppRouter() {
       { path: '/experiences/new', name: 'experience-new', component: Experiences },
       { path: '/experiences/deleted', name: 'experiences-deleted', component: DeletedExperiences },
       { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail },
+      // The same page with one step in the panel, or one of its dialogs open over the flow.
+      { path: '/experiences/:projectId/step/:key', name: 'experience-step', component: ExperienceDetail },
+      { path: '/experiences/:projectId/link/:key', name: 'experience-link', component: ExperienceDetail },
+      { path: '/experiences/:projectId/add', name: 'experience-add', component: ExperienceDetail },
+      { path: '/experiences/:projectId/test', name: 'experience-test', component: ExperienceDetail },
+      { path: '/experiences/:projectId/publish', name: 'experience-publish', component: ExperienceDetail },
+      { path: '/experiences/:projectId/advanced', name: 'experience-advanced', component: ExperienceDetail },
       // Scan objects and boxes are organisation-scoped on the backend, so the organisation is part
       // of the detail path: a shared or reopened link would otherwise not know where to look.
       { path: '/scan-objects', name: 'scan-objects', component: ScanObjects },
