@@ -78,16 +78,37 @@ export function readFlow(doc: ExperienceDto): Pick<Authoring, 'details' | 'islan
 // ─────────────────────────── writing ───────────────────────────
 
 /**
- * The block types the backend knows. A ready-made question screen is stored as a QUIZ block (its
- * words, answers and picture as they are). Sound and video on the Box have no block type there
- * yet, so they stay in the flow only.
+ * The block types the backend knows, and the field of each that holds its file. A ready-made
+ * question screen keeps its words, answers and picture or video as they are.
  */
 const STORED_TYPE: Record<string, BlockType> = {
   TEXT: 'TEXT',
   IMAGE: 'IMAGE',
+  ILLUSTRATION: 'ILLUSTRATION',
   VIDEO: 'VIDEO',
-  ILLUSTRATION: 'IMAGE',
-  SCREEN: 'QUIZ',
+  SCREEN: 'SCREEN',
+  AUDIO: 'AUDIO',
+  BOX_VIDEO: 'BOX_VIDEO',
+}
+
+/** The library item a block shows, as the backend checks it (content.mediaId). */
+function blockMedia(type: BlockType, content: Record<string, unknown>): string | null {
+  switch (type) {
+    case 'IMAGE':
+    case 'ILLUSTRATION':
+      return mediaRef(String(content.url ?? ''), 'IMAGE')
+    case 'VIDEO':
+    case 'BOX_VIDEO':
+      return mediaRef(String(content.url ?? ''), 'VIDEO')
+    case 'AUDIO':
+      return mediaRef(String(content.url ?? ''), 'AUDIO')
+    case 'SCREEN': {
+      const v = String(content.screenMedia ?? '')
+      return mediaRef(v, 'IMAGE') ?? mediaRef(v, 'VIDEO')
+    }
+    default:
+      return null
+  }
 }
 
 /**
@@ -219,9 +240,7 @@ export function toWriteRequest(a: Authoring, base: ExperienceDto): ExperienceWri
     for (const b of sc.blocks) {
       const type = STORED_TYPE[b.type]
       if (!type) continue
-      // The file a picture or video block shows, as the library item the backend checks.
-      const mediaId =
-        type === 'IMAGE' || type === 'VIDEO' ? mediaRef(String(b.content.url ?? ''), type === 'VIDEO' ? 'VIDEO' : 'IMAGE') : null
+      const mediaId = blockMedia(type, b.content)
       blocks.push({
         blockKey: keys.blockKey(),
         type,

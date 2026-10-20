@@ -429,8 +429,8 @@ export async function listMembers(orgId: string): Promise<MemberDto[]> {
 // version answers 409 with the CURRENT document as its body (not an error envelope); an invalid
 // document answers 400 VALIDATION_ERROR with one line per problem in `details`.
 
-export type BlockType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'QUIZ' | 'BUTTON' | 'TRUE_FALSE'
-export const BLOCK_TYPES: BlockType[] = ['TEXT', 'IMAGE', 'VIDEO', 'QUIZ', 'BUTTON', 'TRUE_FALSE']
+export type BlockType = 'TEXT' | 'IMAGE' | 'ILLUSTRATION' | 'VIDEO' | 'SCREEN' | 'AUDIO' | 'BOX_VIDEO'
+export const BLOCK_TYPES: BlockType[] = ['TEXT', 'IMAGE', 'ILLUSTRATION', 'VIDEO', 'SCREEN', 'AUDIO', 'BOX_VIDEO']
 
 /**
  * Rule model v2: when (trigger) … if (condition) … do (effects, in order) … then (destination).
