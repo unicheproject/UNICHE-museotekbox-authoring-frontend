@@ -3,7 +3,6 @@ import { useAuthStore } from '@/stores/auth'
 import Dashboard from '@/views/Dashboard.vue'
 import Login from '@/views/Login.vue'
 import Experiences from '@/views/Experiences.vue'
-import CreateExperience from '@/views/CreateExperience.vue'
 import ExperienceDetail from '@/views/ExperienceDetail.vue'
 import DeletedExperiences from '@/views/DeletedExperiences.vue'
 import ScanObjects from '@/views/ScanObjects.vue'
@@ -25,8 +24,8 @@ export function createAppRouter() {
       { path: '/', name: 'dashboard', component: Dashboard },
       { path: '/experiences', name: 'experiences', component: Experiences },
       // Must come before '/experiences/:projectId' so 'new' and 'deleted' are not captured as
-      // project ids.
-      { path: '/experiences/new', name: 'experience-new', component: CreateExperience },
+      // project ids. 'new' is the list with the New experience dialog open over it.
+      { path: '/experiences/new', name: 'experience-new', component: Experiences },
       { path: '/experiences/deleted', name: 'experiences-deleted', component: DeletedExperiences },
       { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail },
       // Scan objects and boxes are organisation-scoped on the backend, so the organisation is part

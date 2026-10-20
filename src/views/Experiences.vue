@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, onMounted, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { Briefcase, LayoutGrid, Rows3, Trash2 } from 'lucide-vue-next'
+import { ArrowRight, Briefcase, Plus, Trash2 } from 'lucide-vue-next'
 import { useAuthzStore } from '@/stores/authz'
-import { listProjects, type ProjectDto } from '@/api/museotekBox'
+import { listProjects } from '@/api/museotekBox'
+import ExperienceCover from '@/components/experience/ExperienceCover.vue'
 import { useOrgNames } from '@/lib/useOrgNames'
 import { useQuery } from '@/lib/useQuery'
-import { useDataList } from '@/lib/useDataList'
 import { statusVariant } from '@/lib/status'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { PageHeader } from '@/components/ui/page-header'
-import { SearchInput } from '@/components/ui/input'
-import { Select, type SelectOption } from '@/components/ui/select'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pagination } from '@/components/ui/pagination'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import CreateExperienceDialog from '@/components/experience/CreateExperienceDialog.vue'
 
+/** The tool this frontend authors for; the organisation's projects include other tools' too. */
+const TOOL_SLUG = 'museotekbox'
+
+const route = useRoute()
 const router = useRouter()
 const authzStore = useAuthzStore()
 const { context } = storeToRefs(authzStore)
@@ -38,6 +38,11 @@ const orgIds = computed(() => {
 const canCreate = computed(
   () => context.value?.platformAdmin || (context.value?.managedOrganisations.length ?? 0) > 0,
 )
+/** The New experience dialog has its own address, so it opens over the list from a link too. */
+const createOpen = computed(() => route.name === 'experience-new' && canCreate.value)
+/** The experience is created in the organisation the author manages; they are not asked which. */
+const createOrgId = computed(() => context.value?.managedOrganisations[0] ?? '')
+
 const canSeeDeleted = computed(
   () => context.value?.platformAdmin === true || (context.value?.managedOrganisations.length ?? 0) > 0,
 )
@@ -52,72 +57,31 @@ const { data, pending, error } = useQuery(
 onMounted(() => authzStore.load())
 watch(orgIds, (ids) => ids.length && resolveOrgNames(ids), { immediate: true })
 
-const orgFilter = ref('')
-const statusFilter = ref('')
+/** This tool's experiences, most recently changed first. */
+const experiences = computed(() =>
+  (data.value ?? [])
+    .filter((p) => p.toolSlug === TOOL_SLUG)
+    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')),
+)
 
-const orgOptions = computed<SelectOption[]>(() => [
-  { value: '', label: 'All organisations' },
-  ...orgIds.value.map((id) => ({ value: id, label: orgNames.value[id] ?? id })),
-])
+const grid = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
 
-/** Statuses are not a published enum — offer exactly the ones present in the data. */
-const statusOptions = computed<SelectOption[]>(() => {
-  const present = Array.from(new Set((data.value ?? []).map((p) => p.status))).sort()
-  return [{ value: '', label: 'All statuses' }, ...present.map((s) => ({ value: s, label: s }))]
+/** "Acropolis Museum · 3 experiences", as shown under the title. */
+const subtitle = computed(() => {
+  const names = orgIds.value.map((id) => orgNames.value[id]).filter(Boolean)
+  const n = experiences.value.length
+  return `${names.length ? names.join(', ') + ' · ' : ''}${n} experience${n === 1 ? '' : 's'}`
 })
-
-const filters = computed(() => {
-  const predicates: ((p: ProjectDto) => boolean)[] = []
-  if (orgFilter.value) predicates.push((p) => p.orgId === orgFilter.value)
-  if (statusFilter.value) predicates.push((p) => p.status === statusFilter.value)
-  return predicates
-})
-
-const list = useDataList<ProjectDto>(data, {
-  searchFields: (p) => [p.name],
-  sortValues: {
-    name: (p) => p.name,
-    organisation: (p) => orgNames.value[p.orgId] ?? p.orgId,
-    status: (p) => p.status,
-    updated: (p) => p.updatedAt ?? '',
-  },
-  // Most recently touched first: the natural default for a working list. Experiences with no
-  // timestamp (older backend builds) sink to the bottom rather than to the top.
-  initialSort: { key: 'updated', direction: 'desc' },
-  pageSize: 12,
-  filters,
-})
-
-const view = ref<'cards' | 'table'>('cards')
-
-const columns = computed<DataTableColumn<ProjectDto>[]>(() => [
-  { key: 'name', label: 'Name', sortable: true },
-  { key: 'organisation', label: 'Organisation', sortable: true },
-  { key: 'status', label: 'Status', sortable: true, headClass: 'w-32' },
-  { key: 'updated', label: 'Updated', sortable: true, headClass: 'w-32' },
-  { key: 'slug', label: 'Slug', class: 'text-muted-foreground' },
-])
-
-/** Two-letter monogram for the card's tile, the same rule the Dashboard rows use. */
-function monogram(name: string) {
-  const parts = name.split(/\s+/).filter(Boolean)
-  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '—'
-}
-
-/** Short, locale-aware date; the exact time is noise in a list. */
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
-}
-
-const toggleBase =
-  'inline-flex h-9 w-9 items-center justify-center rounded-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 </script>
 
 <template>
   <div>
-    <PageHeader title="Experiences">
-      <template #actions>
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-extrabold tracking-tight">Experiences</h1>
+        <p class="mt-0.5 text-[13px] text-muted-foreground">{{ subtitle }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
         <RouterLink
           v-if="canSeeDeleted"
           to="/experiences/deleted"
@@ -131,151 +95,52 @@ const toggleBase =
           to="/experiences/new"
           :class="buttonVariants({ variant: 'gradient', size: 'sm' })"
         >
-          New Experience
+          <Plus class="h-4 w-4" />
+          New experience
         </RouterLink>
-      </template>
-    </PageHeader>
+      </div>
+    </div>
 
-    <div class="space-y-6">
-      <!-- Search and facets sit above the view switch so they survive switching cards ↔ table:
-           both views render the same `useDataList` result. -->
-      <div class="flex flex-wrap items-center gap-3">
-        <SearchInput
-          v-model="list.search.value"
-          label="Search experiences by name"
-          placeholder="Search by name…"
-        />
+    <Alert v-if="error" variant="error" title="Couldn't load your experiences">{{ error }}</Alert>
 
-        <Select
-          v-model="orgFilter"
-          :options="orgOptions"
-          class="w-52"
-          aria-label="Filter by organisation"
-        />
-        <Select
-          v-model="statusFilter"
-          :options="statusOptions"
-          class="w-44"
-          aria-label="Filter by status"
-        />
-
-        <div class="flex items-center gap-1 rounded-md border border-border bg-card p-1">
-          <button
-            type="button"
-            aria-label="Card view"
-            :aria-pressed="view === 'cards'"
-            :class="[
-              toggleBase,
-              view === 'cards' ? 'bg-brand-deep text-white' : 'text-muted-foreground hover:bg-secondary',
-            ]"
-            @click="view = 'cards'"
-          >
-            <LayoutGrid class="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Table view"
-            :aria-pressed="view === 'table'"
-            :class="[
-              toggleBase,
-              view === 'table' ? 'bg-brand-deep text-white' : 'text-muted-foreground hover:bg-secondary',
-            ]"
-            @click="view = 'table'"
-          >
-            <Rows3 class="h-4 w-4" />
-          </button>
+    <div v-else-if="pending" :class="grid">
+      <div v-for="n in 8" :key="n" class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <Skeleton class="h-24 w-full rounded-none" />
+        <div class="space-y-3 p-4">
+          <Skeleton class="h-4 w-32" />
+          <Skeleton class="h-4 w-16" />
         </div>
       </div>
-
-      <template v-if="view === 'table'">
-        <DataTable
-          :columns="columns"
-          :rows="list.rows.value"
-          :row-key="(row) => row.id"
-          :sort-key="list.sortKey.value"
-          :sort-direction="list.sortDirection.value"
-          :loading="pending"
-          :error="error"
-          clickable
-          empty-title="No experiences"
-          @sort="list.toggleSort"
-          @row-click="(row) => router.push(`/experiences/${row.id}`)"
-        >
-          <template #cell-organisation="{ row }">
-            {{ orgNames[row.orgId] ?? row.orgId }}
-          </template>
-          <template #cell-status="{ row }">
-            <Badge :variant="statusVariant(row.status)" dot>{{ row.status }}</Badge>
-          </template>
-          <template #cell-updated="{ row }">
-            <span class="text-muted-foreground">{{ row.updatedAt ? formatDate(row.updatedAt) : '—' }}</span>
-          </template>
-        </DataTable>
-      </template>
-
-      <template v-else>
-        <Alert v-if="error" variant="error" title="Couldn't load your experiences">{{ error }}</Alert>
-
-        <div v-else-if="pending" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card v-for="n in 6" :key="n">
-            <CardHeader><Skeleton class="h-5 w-40" /></CardHeader>
-            <CardContent class="space-y-2">
-              <Skeleton class="h-4 w-28" />
-              <Skeleton class="h-4 w-16" />
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card v-else-if="!list.total.value">
-          <EmptyState title="No experiences" :icon="Briefcase" />
-        </Card>
-
-        <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <RouterLink
-            v-for="exp in list.rows.value"
-            :key="exp.id"
-            :to="`/experiences/${exp.id}`"
-            class="block h-full rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <!-- The card carries every column the table shows, so switching views loses nothing. -->
-            <Card
-              class="flex h-full flex-col p-5 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div class="flex items-start gap-3 pb-5">
-                <span
-                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-deep/[0.08] text-[11px] font-extrabold text-brand-deep"
-                >
-                  {{ monogram(exp.name) }}
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-[15px] font-bold leading-tight text-foreground">
-                    {{ exp.name }}
-                  </span>
-                  <span class="mt-1 block truncate text-xs text-muted-foreground">
-                    {{ orgNames[exp.orgId] ?? exp.orgId }}
-                  </span>
-                </span>
-                <Badge :variant="statusVariant(exp.status)" dot>{{ exp.status }}</Badge>
-              </div>
-
-              <!-- One quiet line of metadata instead of a three-row label/value table, which read
-                   as a form rather than as a card. -->
-              <div
-                class="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground"
-              >
-                <span class="truncate font-mono">{{ exp.slug }}</span>
-                <span class="shrink-0">{{ exp.updatedAt ? formatDate(exp.updatedAt) : '—' }}</span>
-              </div>
-            </Card>
-          </RouterLink>
-        </div>
-      </template>
-
-      <Pagination
-        v-model:page="list.page.value"
-        :page-size="list.pageSize.value"
-        :total="list.total.value"
-      />
     </div>
+
+    <Card v-else-if="!experiences.length">
+      <EmptyState title="No experiences" :icon="Briefcase" />
+    </Card>
+
+    <!-- The experience card: a dark picture band over the name, and
+         the status the Dashboard shows beside "Open". -->
+    <div v-else :class="grid">
+      <RouterLink
+        v-for="exp in experiences"
+        :key="exp.id"
+        :to="`/experiences/${exp.id}`"
+        class="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-deep/35 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <ExperienceCover :project-id="exp.id" :org-id="exp.orgId" />
+        <span class="flex flex-1 flex-col p-4">
+          <span class="mb-4 line-clamp-2 text-sm font-bold leading-snug text-foreground">
+            {{ exp.name || 'Untitled experience' }}
+          </span>
+          <span class="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3">
+            <Badge :variant="statusVariant(exp.status)" dot>{{ exp.status }}</Badge>
+            <span class="inline-flex items-center gap-1 text-xs font-bold text-brand-deep">
+              Open<ArrowRight class="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5" />
+            </span>
+          </span>
+        </span>
+      </RouterLink>
+    </div>
+
+    <CreateExperienceDialog v-if="createOpen" :org-id="createOrgId" @close="router.push('/experiences')" />
   </div>
 </template>
