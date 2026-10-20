@@ -30,7 +30,8 @@ const props = defineProps<{
   /** A change is still being saved. */
   pending?: boolean
 }>()
-const emit = defineEmits<{ back: [] }>()
+/** `published`: whether it is on at least one Box now. */
+const emit = defineEmits<{ back: []; published: [on: boolean] }>()
 
 interface BoxRow {
   box: BoxDto
@@ -97,6 +98,7 @@ async function publish() {
       r.has = want
     }
     done.value = rows.value.filter((r) => r.has)
+    emit('published', done.value.length > 0)
   } catch (e) {
     error.value = describeError(e)
   } finally {

@@ -20,7 +20,7 @@ import { useAuthoring } from '@/lib/authoring/useAuthoring'
 import { useComments } from '@/lib/authoring/useComments'
 import { Alert } from '@/components/ui/alert'
 import { ConfirmDialog } from '@/components/ui/dialog'
-import { deleteProject, describeError } from '@/api/museotekBox'
+import { deleteProject, describeError, listBoxProjects, listBoxes } from '@/api/museotekBox'
 import { Skeleton } from '@/components/ui/skeleton'
 import AIcon from '@/components/authoring/AIcon.vue'
 import StepCard from '@/components/authoring/StepCard.vue'
@@ -190,6 +190,20 @@ watch(sel, (now) => {
   if (drawer.value && drawerStep.value && drawerStep.value !== now) drawerStep.value = now
 })
 
+/** Published: it is on at least one of the museum's Boxes. */
+const published = ref(false)
+async function loadPublished() {
+  if (!project.value) return
+  const { orgId, id } = project.value
+  try {
+    const boxes = await listBoxes(orgId)
+    const installed = await Promise.all(boxes.map((b) => listBoxProjects(orgId, b.id)))
+    published.value = installed.some((ps) => ps.some((p) => p.id === id))
+  } catch {
+    // Not knowing only means the header says Draft; the Publish page shows the Boxes itself.
+  }
+}
+
 /** Whether what is on the page has reached the backend. */
 const saving = computed(() => pending.value)
 
@@ -212,6 +226,7 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
   await load()
   dialogFromRoute()
+  void loadPublished()
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 </script>
@@ -240,6 +255,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       :save-error="saveError"
       :pending="pending"
       @back="router.push(base)"
+      @published="(on) => (published = on)"
     />
     <ScenesRules
       v-else-if="advanced"
@@ -264,7 +280,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
               class="inline-flex items-center gap-2 rounded-pill border border-border bg-white px-3 py-1 text-[12px] font-bold text-secondary-foreground hover:border-brand-deep"
               @click="dlg = { kind: 'fixes' }"
             >
-              <span class="h-2 w-2 rounded-pill bg-muted-foreground/50" />Draft
+              <template v-if="published"><span class="h-2 w-2 rounded-pill bg-success" /><span class="text-success">Published</span></template>
+              <template v-else><span class="h-2 w-2 rounded-pill bg-muted-foreground/50" />Draft</template>
               <span class="text-muted-foreground">·</span>
               <span v-if="fixes.length" class="text-warning">{{ fixes.length }} to fix</span>
               <template v-else>ready to publish</template>
