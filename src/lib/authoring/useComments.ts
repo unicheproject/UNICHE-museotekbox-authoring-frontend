@@ -6,14 +6,15 @@ import {
   setCommentResolved,
   type CommentThreadDto,
 } from '@/api/museotekBox'
+import { invalidate } from '@/lib/queries'
 import { stepName as flowStepName, type Authoring, type Scene } from './engine'
 
 /**
  * The comments on one experience: anyone looking at it — in a test run or on its
- * page — can comment on a screen, and anyone can reply. Kept fresh every few seconds so what others
+ * page — can comment on a screen, and anyone can reply. Re-read every half minute so what others
  * write turns up without a reload. One instance per experience page, shared with its test run.
  */
-const REFRESH_MS = 5000
+const REFRESH_MS = 30_000
 
 /** The idle Box has no scene of its own; its comments carry this key. */
 export const IDLE_SCENE = 'idle'
@@ -68,6 +69,7 @@ export function useComments(projectId: Ref<string>) {
       return failed()
     }
     error.value = ''
+    invalidate.commentCounts()
     await refresh()
     return true
   }
@@ -82,6 +84,7 @@ export function useComments(projectId: Ref<string>) {
     }
     error.value = ''
     ui.open.add(rootId)
+    invalidate.commentCounts()
     await refresh()
     return true
   }
@@ -90,6 +93,7 @@ export function useComments(projectId: Ref<string>) {
     try {
       const t = await setCommentResolved(projectId.value, id, value)
       threads.value = threads.value.map((x) => (x.id === id ? t : x))
+      invalidate.commentCounts()
     } catch {
       failed()
     }

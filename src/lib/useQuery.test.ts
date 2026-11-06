@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, nextTick, ref } from 'vue'
 import { AxiosError, AxiosHeaders } from 'axios'
-import { clearQueryCache, invalidateQueries, useMutation, useQuery } from './useQuery'
+import { clearQueryCache, fetchQuery, invalidateQueries, setQueryData, useMutation, useQuery } from './useQuery'
 
 afterEach(() => {
   clearQueryCache()
@@ -200,5 +200,59 @@ describe('useMutation', () => {
 
     await result.mutate()
     expect(result.error.value).toBeNull()
+  })
+})
+
+describe('fetchQuery', () => {
+  it('fetches once, then serves the cache while fresh', async () => {
+    const fetcher = vi.fn().mockResolvedValue(['a'])
+    expect(await fetchQuery('items', fetcher)).toEqual(['a'])
+    expect(await fetchQuery('items', fetcher)).toEqual(['a'])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('shares the cache with useQuery', async () => {
+    const fetcher = vi.fn().mockResolvedValue(['a'])
+    await fetchQuery('items', fetcher)
+    const { result } = inScope(() => useQuery('items', fetcher))
+    expect(result.data.value).toEqual(['a'])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('joins a request already in flight', async () => {
+    const fetcher = vi.fn().mockResolvedValue(['a'])
+    const [a, b] = await Promise.all([fetchQuery('items', fetcher), fetchQuery('items', fetcher)])
+    expect(a).toEqual(['a'])
+    expect(b).toEqual(['a'])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('refetches when asked for something fresher than the cache', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(['a']).mockResolvedValueOnce(['b'])
+    await fetchQuery('items', fetcher)
+    expect(await fetchQuery('items', fetcher, { staleMs: 0 })).toEqual(['b'])
+  })
+
+  it('throws what the fetcher threw', async () => {
+    const boom = new Error('boom')
+    await expect(fetchQuery('items', vi.fn().mockRejectedValue(boom))).rejects.toBe(boom)
+  })
+})
+
+describe('setQueryData', () => {
+  it('updates the views watching the key without a request', async () => {
+    const fetcher = vi.fn().mockResolvedValue(['a'])
+    const { result } = inScope(() => useQuery('items', fetcher))
+    await settle()
+    setQueryData('items', ['b'])
+    expect(result.data.value).toEqual(['b'])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('seeds a key that nobody has asked for yet', async () => {
+    setQueryData('items', ['seeded'])
+    const fetcher = vi.fn().mockResolvedValue(['a'])
+    expect(await fetchQuery('items', fetcher)).toEqual(['seeded'])
+    expect(fetcher).not.toHaveBeenCalled()
   })
 })

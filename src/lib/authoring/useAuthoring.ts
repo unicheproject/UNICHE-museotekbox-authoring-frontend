@@ -3,17 +3,16 @@ import {
   StaleExperienceError,
   createProject,
   describeError,
-  getExperience,
   getProject,
-  listScanObjectTypes,
   saveExperience,
   updateProject,
   type ExperienceDto,
   type ProjectDto,
 } from '@/api/museotekBox'
 import { slugify } from '@/lib/slug'
-import { addIsland, newDetails, rebuild, type Authoring, type OutputId } from './engine'
-import { readFlow, scanTypesFrom, toWriteRequest } from './document'
+import { fetchShared, invalidate, storeExperience } from '@/lib/queries'
+import { addIsland, fixRows, newDetails, rebuild, type Authoring, type OutputId, type ScanType } from './engine'
+import { readFlow, toWriteRequest } from './document'
 import { loadMediaLibrary } from './media'
 
 const SAVE_DELAY = 600
@@ -32,21 +31,24 @@ function blankAuthoring(): Authoring {
 export async function createExperience(
   orgId: string,
   input: { name: string; output: OutputId; first: string | null },
-): Promise<{ project: ProjectDto; saveError: string | null }> {
+): Promise<{ project: ProjectDto; saveError: string | null; firstKey: string | null }> {
   const name = input.name.trim()
   const slug = slugify(name) || `experience-${Date.now().toString(36)}`
   const project = await createProject(orgId, { name, slug })
   try {
-    const [base, types] = await Promise.all([getExperience(project.id), listScanObjectTypes(orgId)])
+    const [base, types] = await Promise.all([
+      fetchShared('experience', project.id, { staleMs: 0 }),
+      fetchShared('scanTypes', orgId),
+    ])
     const a = blankAuthoring()
-    a.scanTypes = scanTypesFrom(types)
+    a.scanTypes = types
     a.details = newDetails({ name, output: input.output })
-    if (input.first) addIsland(a, input.first)
-    else rebuild(a)
-    await saveExperience(project.id, base.version, toWriteRequest(a, base))
-    return { project, saveError: null }
+    const firstKey = input.first ? addIsland(a, input.first).key : null
+    if (!firstKey) rebuild(a)
+    storeExperience(await saveExperience(project.id, base.version, toWriteRequest(a, base)))
+    return { project, saveError: null, firstKey }
   } catch (e) {
-    return { project, saveError: describeError(e) }
+    return { project, saveError: describeError(e), firstKey: null }
   }
 }
 
@@ -88,12 +90,14 @@ export function useAuthoring(projectId: Ref<string>) {
     try {
       const p = await getProject(projectId.value)
       project.value = p
+      // The document is always read fresh: it is what the next save builds on. The scan types may
+      // come from the cache the experiences list filled.
       const [doc, types] = await Promise.all([
-        getExperience(p.id),
-        listScanObjectTypes(p.orgId),
+        fetchShared('experience', p.id, { staleMs: 0 }),
+        fetchShared('scanTypes', p.orgId),
         loadMediaLibrary(p.orgId),
       ])
-      authoring.scanTypes = scanTypesFrom(types)
+      authoring.scanTypes = types
       adopt(doc)
     } catch (e) {
       error.value = describeError(e)
@@ -111,11 +115,14 @@ export function useAuthoring(projectId: Ref<string>) {
     saving = true
     try {
       base = await saveExperience(base.projectId, base.version, toWriteRequest(authoring, base))
+      // The list's card for it now shows what was just saved, without asking again.
+      storeExperience(base)
       saveError.value = null
     } catch (e) {
       if (e instanceof StaleExperienceError) {
         // Someone else saved first: show what is there now rather than overwrite it.
         adopt(e.current)
+        storeExperience(e.current)
         saveError.value = e.message
       } else {
         saveError.value = describeError(e)
@@ -156,6 +163,7 @@ export function useAuthoring(projectId: Ref<string>) {
     }
     try {
       project.value = await updateProject(project.value.id, { name })
+      invalidate.projects()
       saveError.value = null
     } catch (e) {
       saveError.value = describeError(e)
@@ -185,4 +193,46 @@ export function useAuthoring(projectId: Ref<string>) {
   })
 
   return { authoring, project, loading, error, saveError, pending, renaming, load, commit, rename }
+}
+
+/** What an experience's card in the list says about it, read from its document. */
+export interface ExperienceSummary {
+  output: OutputId
+  /** The template of each activity, in order. */
+  templates: string[]
+  /** Things left before it can be published; null when the scan types are not known. */
+  missing: number | null
+  /** The picture the visitor sees first, else the first picture it shows anywhere. */
+  pictureId: string | null
+}
+
+/** Read a saved experience the way its page would, for its card in the list. */
+export function summarize(doc: ExperienceDto, types: ScanType[] | null): ExperienceSummary {
+  const saved = readFlow(doc)
+  const a = blankAuthoring()
+  a.details = saved?.details ?? newDetails({ output: doc.output ?? 'DISPLAY' })
+  a.islands = saved?.islands ?? []
+  a.islandSeq = saved?.islandSeq ?? 0
+  a.edits = saved?.edits ?? {}
+  a.scanTypes = types ?? []
+  let missing: number | null = null
+  if (types) {
+    try {
+      rebuild(a)
+      missing = fixRows(a).length
+    } catch {
+      missing = null
+    }
+  }
+  const pictureOf = (scenes: ExperienceDto['scenes']) =>
+    scenes
+      .flatMap((s) => s.blocks)
+      .map((b) => (b.type === 'IMAGE' && b.content && typeof b.content === 'object' && !Array.isArray(b.content) ? b.content.mediaId : null))
+      .find((id): id is string => typeof id === 'string')
+  return {
+    output: a.details.output,
+    templates: a.islands.map((x) => x.templateId),
+    missing,
+    pictureId: pictureOf(doc.scenes.filter((s) => s.isStart)) ?? pictureOf(doc.scenes) ?? null,
+  }
 }

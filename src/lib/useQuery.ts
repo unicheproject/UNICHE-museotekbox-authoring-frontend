@@ -25,6 +25,10 @@ interface CacheEntry {
   fetcher: () => Promise<unknown>
   subscribers: number
   inFlight: Promise<void> | null
+  /** What the last failed run threw, for `fetchQuery` to rethrow. */
+  failure: unknown
+  /** Counts successful runs, so `fetchQuery` can tell whether the one it waited for succeeded. */
+  successes: number
 }
 
 const cache = new Map<string, CacheEntry>()
@@ -43,8 +47,10 @@ function run(entry: CacheEntry, force = false): Promise<void> {
       entry.data.value = data
       entry.error.value = null
       entry.fetchedAt = Date.now()
+      entry.successes += 1
     })
     .catch((e: unknown) => {
+      entry.failure = e
       entry.error.value = parseError(e).message
     })
     .finally(() => {
@@ -75,6 +81,8 @@ function entryFor(key: string, fetcher: () => Promise<unknown>): CacheEntry {
     fetcher,
     subscribers: 0,
     inFlight: null,
+    failure: null,
+    successes: 0,
   }
   cache.set(key, created)
   return created
@@ -151,6 +159,40 @@ export function useQuery<T>(
     pending: pending as Ref<boolean>,
     refresh: () => (active.value ? run(active.value, true) : Promise.resolve()),
   }
+}
+
+/**
+ * Read a query outside a component (a composable's `load()`, a fetcher built from other queries):
+ * served from the cache while fresh, otherwise fetched — joining a request already in flight — and
+ * cached for every view that subscribes to the same key. Unlike `useQuery` it throws on failure.
+ */
+export async function fetchQuery<T>(
+  key: QueryKey,
+  fetcher: () => Promise<T>,
+  options: { staleMs?: number } = {},
+): Promise<T> {
+  const staleMs = options.staleMs ?? DEFAULT_STALE_MS
+  const entry = entryFor(serializeKey(key), fetcher as () => Promise<unknown>)
+  const fresh = entry.fetchedAt && Date.now() - entry.fetchedAt < staleMs
+  if (!fresh || entry.inFlight) {
+    const before = entry.successes
+    await run(entry)
+    if (entry.successes === before) throw entry.failure ?? new Error(entry.error.value ?? 'Request failed')
+  }
+  return entry.data.value as T
+}
+
+/**
+ * Put a value the caller already has into the cache — e.g. the document a save returned — so the
+ * views showing that key update without asking the server again.
+ */
+export function setQueryData<T>(key: QueryKey, data: T): void {
+  const k = serializeKey(key)
+  // An existing entry keeps its fetcher; a new one gets a placeholder the first subscriber replaces.
+  const entry = cache.get(k) ?? entryFor(k, () => Promise.reject(new Error('No fetcher for this query yet')))
+  entry.data.value = data
+  entry.error.value = null
+  entry.fetchedAt = Date.now()
 }
 
 /**

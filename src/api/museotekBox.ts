@@ -747,6 +747,18 @@ export async function listComments(projectId: string): Promise<CommentThreadDto[
   return res.data
 }
 
+/** Open threads per experience of an organisation, one entry per experience the caller can see. */
+export interface CommentCountDto {
+  projectId: string
+  open: number
+}
+
+/** The "N comments" of every experience in the list, in one call. */
+export async function listCommentCounts(orgId: string): Promise<CommentCountDto[]> {
+  const res = await http.get<CommentCountDto[]>(`/organisations/${orgId}/comment-counts`)
+  return res.data
+}
+
 /** Start a thread about a screen and a step. Body up to 2000 characters. */
 export async function addComment(
   projectId: string,

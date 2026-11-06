@@ -5,15 +5,9 @@ import { storeToRefs } from 'pinia'
 import { Briefcase, ChevronRight, Package, ScanLine, Users } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAuthzStore } from '@/stores/authz'
-import {
-  describeError,
-  listBoxes,
-  listMembers,
-  listProjects,
-  listScanObjects,
-  type ProjectDto,
-} from '@/api/museotekBox'
+import { describeError, type ProjectDto } from '@/api/museotekBox'
 import { useOrgNames } from '@/lib/useOrgNames'
+import { fetchShared } from '@/lib/queries'
 import { statusVariant } from '@/lib/status'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
@@ -59,9 +53,10 @@ const scanObjectCount = ref<number | null>(null)
 const boxCount = ref<number | null>(null)
 const memberCount = ref<number | null>(null)
 
-async function countAcrossOrgs<T>(load: (orgId: string) => Promise<T[]>): Promise<number | null> {
+async function countAcrossOrgs(name: 'scanObjects' | 'boxes' | 'members'): Promise<number | null> {
   try {
-    const lists = await Promise.all(orgIds.value.map(load))
+    // Through the shared cache: opening that screen next shows them without asking again.
+    const lists: unknown[][] = await Promise.all(orgIds.value.map((orgId) => fetchShared(name, orgId)))
     return lists.reduce((total, list) => total + list.length, 0)
   } catch {
     return null
@@ -88,7 +83,8 @@ async function load() {
     await authzStore.load()
     if (!context.value) return
     await resolveOrgNames(orgIds.value)
-    const lists = await Promise.all(orgIds.value.map((orgId) => listProjects(orgId)))
+    // Through the shared cache, so opening Experiences right after does not ask again.
+    const lists = await Promise.all(orgIds.value.map((orgId) => fetchShared('projects', orgId)))
     experiences.value = lists.flat()
   } catch (e) {
     error.value = describeError(e)
@@ -98,9 +94,9 @@ async function load() {
 
   // Deliberately after the experiences render: the list is the point of the screen, the counts are
   // decoration, and they must not hold up first paint.
-  void countAcrossOrgs(listScanObjects).then((n) => (scanObjectCount.value = n))
-  void countAcrossOrgs(listBoxes).then((n) => (boxCount.value = n))
-  void countAcrossOrgs(listMembers).then((n) => (memberCount.value = n))
+  void countAcrossOrgs('scanObjects').then((n) => (scanObjectCount.value = n))
+  void countAcrossOrgs('boxes').then((n) => (boxCount.value = n))
+  void countAcrossOrgs('members').then((n) => (memberCount.value = n))
 }
 
 onMounted(load)

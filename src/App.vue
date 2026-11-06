@@ -151,8 +151,10 @@ const navActive = 'bg-brand-deep/[0.08] font-bold text-brand-deep'
            a hairline, which is what made the lists read as unfinished. -->
       <main class="flex-1 bg-surface-2 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <!-- One width cap for every screen, so the app does not read as two different layouts on a
-             wide monitor (the dashboard used to cap itself while the lists ran edge to edge). -->
-        <div class="mx-auto w-full max-w-[1180px]">
+             wide monitor (the dashboard used to cap itself while the lists ran edge to edge). A grid
+             of cards (route meta `wide`) is the exception: past laptop size it fills the width with
+             more columns rather than leave empty bands on both sides. -->
+        <div class="mx-auto w-full max-w-[1180px]" :class="{ 'min-[1700px]:max-w-none': route.meta.wide }">
           <RouterView />
         </div>
       </main>

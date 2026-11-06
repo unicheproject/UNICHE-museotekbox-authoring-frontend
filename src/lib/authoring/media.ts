@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
-import { MEDIA_TYPES, getMediaContent, listMedia, uploadMedia, type MediaDto, type MediaKind } from '@/api/museotekBox'
+import { MEDIA_TYPES, getMediaContent, uploadMedia, type MediaDto, type MediaKind } from '@/api/museotekBox'
+import { fetchShared, invalidate } from '@/lib/queries'
 import { MEDIA, type MediaItem } from './engine'
 
 /**
@@ -13,7 +14,8 @@ const toItem = (m: MediaDto): MediaItem => ({ id: m.id, kind: m.kind, name: m.na
 
 /** Fill the library for this organisation. A failure is the caller's to report. */
 export async function loadMediaLibrary(org: string): Promise<void> {
-  const items = await listMedia(org)
+  // Cached for a short while: opening one experience after another does not re-read the library.
+  const items = await fetchShared('media', org)
   orgId = org
   MEDIA.splice(0, MEDIA.length, ...items.map(toItem))
 }
@@ -37,6 +39,7 @@ export const acceptFor = (kind: PickKind) => kindsFor(kind).flatMap((k) => MEDIA
 export async function addToLibrary(file: File, onProgress?: (percent: number) => void): Promise<MediaItem> {
   if (!orgId) throw new Error('The media library is not loaded.')
   const item = toItem(await uploadMedia(orgId, file, onProgress))
+  invalidate.media()
   MEDIA.unshift(item)
   return item
 }
@@ -55,6 +58,20 @@ export function thumbOf(id: string): string | undefined {
   if (url || !orgId || asked.has(id)) return url
   asked.add(id)
   getMediaContent(orgId, id)
+    .then((blob) => (thumbs[id] = URL.createObjectURL(blob)))
+    .catch(() => asked.delete(id))
+  return undefined
+}
+
+/**
+ * The same, for a screen that has not loaded the library — the experiences list. Reactive: it is
+ * undefined until the file arrives. Shared with the experience page, so a picture is fetched once.
+ */
+export function mediaUrlIn(org: string, id: string): string | undefined {
+  const url = thumbs[id]
+  if (url || asked.has(id)) return url
+  asked.add(id)
+  getMediaContent(org, id)
     .then((blob) => (thumbs[id] = URL.createObjectURL(blob)))
     .catch(() => asked.delete(id))
   return undefined
