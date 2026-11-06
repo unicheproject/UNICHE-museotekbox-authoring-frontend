@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { hasDisplay, type Authoring } from '@/lib/authoring/engine'
-import AField from './AField.vue'
-import MediaPicker from './MediaPicker.vue'
-import TypeSelect from './TypeSelect.vue'
+import MediaField from './ui/MediaField.vue'
+import MoreSettings from './ui/MoreSettings.vue'
+import MoveOnCard from './ui/MoveOnCard.vue'
+import QCard from './ui/QCard.vue'
+import ScanField from './ui/ScanField.vue'
+import Sub from './ui/Sub.vue'
 
 /**
- * The Start step: the object that starts the visit, and what the
- * visitor sees and hears first, on the screen and on the Box.
+ * The Start's page: the scan that starts the visit, what the visitor sees and hears first, and when
+ * they move on to the first activity. A video on the Box's own display is under "More settings".
  */
 const props = defineProps<{ a: Authoring }>()
 const emit = defineEmits<{ change: [] }>()
 
 // Read live: a reload after someone else's save replaces the details object.
 const d = computed(() => props.a.details)
+const display = computed(() => hasDisplay(props.a))
 
 function set(key: 'startCard' | 'welcomeMedia' | 'welcomeAudio' | 'welcomeBoxVideo', value: string) {
   d.value[key] = value
@@ -22,25 +26,20 @@ function set(key: 'startCard' | 'welcomeMedia' | 'welcomeAudio' | 'welcomeBoxVid
 </script>
 
 <template>
-  <div class="grid gap-5 sm:grid-cols-2">
-    <AField label="Object that starts the experience" help="The Box sits idle and open. Placing this object on it begins the visit.">
-      <TypeSelect :types="a.scanTypes" :model-value="d.startCard" @update:model-value="set('startCard', $event)" />
-    </AField>
-    <AField
-      v-if="hasDisplay(a)"
-      label="What the visitor sees first (optional)"
-      help="A welcome on the screen, the moment the visit begins."
-    >
-      <MediaPicker kind="VISUAL" :model-value="d.welcomeMedia" @update:model-value="set('welcomeMedia', $event)" />
-    </AField>
-    <AField v-else label="What the visitor hears first (optional)" help="A welcome, played the moment the visit begins.">
-      <MediaPicker kind="AUDIO" :model-value="d.welcomeAudio" @update:model-value="set('welcomeAudio', $event)" />
-    </AField>
-    <AField v-if="hasDisplay(a)" label="Sound from the Box (optional)" help="Plays with the welcome.">
-      <MediaPicker kind="AUDIO" :model-value="d.welcomeAudio" @update:model-value="set('welcomeAudio', $event)" />
-    </AField>
-    <AField label="Video on the Box (optional)" help="Plays on the Box’s own display when the visit begins.">
-      <MediaPicker kind="VIDEO" :model-value="d.welcomeBoxVideo" @update:model-value="set('welcomeBoxVideo', $event)" />
-    </AField>
-  </div>
+  <QCard :n="1" title="Which scan starts the visit?" id="start-object" :miss="!d.startCard">
+    <ScanField :types="a.scanTypes" :model-value="d.startCard" @update:model-value="set('startCard', $event)" />
+  </QCard>
+  <QCard v-if="display" :n="2" title="What appears on the screen when it starts?" optional>
+    <MediaField kind="VISUAL" :model-value="d.welcomeMedia" @update:model-value="set('welcomeMedia', $event)" />
+  </QCard>
+  <QCard :n="display ? 3 : 2" title="Does the Box play a sound?" optional>
+    <MediaField kind="AUDIO" :model-value="d.welcomeAudio" @update:model-value="set('welcomeAudio', $event)" />
+  </QCard>
+  <MoveOnCard :a="a" from-key="start" :n="display ? 4 : 3" @change="emit('change')" />
+  <MoreSettings>
+    <div>
+      <Sub title="Video on the Box" optional />
+      <MediaField kind="VIDEO" :model-value="d.welcomeBoxVideo" @update:model-value="set('welcomeBoxVideo', $event)" />
+    </div>
+  </MoreSettings>
 </template>

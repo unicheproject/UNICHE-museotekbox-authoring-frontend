@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import { describeError } from '@/api/museotekBox'
 import { invalidateQueries } from '@/lib/useQuery'
 import { OUTPUTS, TEMPLATES, template, type OutputId } from '@/lib/authoring/engine'
-import { btnOutline, btnPrimary, inputCls } from '@/lib/authoring/html'
 import { createExperience } from '@/lib/authoring/useAuthoring'
+import { toneOf } from '@/lib/authoring/tone'
 import AIcon from '@/components/authoring/AIcon.vue'
 
 /**
@@ -19,6 +19,14 @@ const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
 
 const tiles = [{ id: '', name: 'Decide later', icon: 'plus' }, ...TEMPLATES]
+const steps = { name: 1, output: 2, first: 3 }
+
+const btnDeep =
+  'inline-flex items-center justify-center gap-2 rounded-md bg-brand-deep px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button text-white hover:bg-brand-deep/90 disabled:cursor-not-allowed disabled:opacity-40'
+const btnOutline =
+  'inline-flex items-center justify-center gap-2 rounded-md border border-input bg-white px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button text-secondary-foreground hover:border-brand-deep hover:text-brand-deep disabled:opacity-40'
+const inputCls =
+  'w-full rounded-md border border-input bg-white px-3 py-2 text-[14px] outline-none focus:border-brand-deep focus:ring-2 focus:ring-brand-deep/20'
 
 const name = ref('')
 const output = ref<OutputId>('DISPLAY')
@@ -50,9 +58,10 @@ async function create() {
   busy.value = true
   error.value = null
   try {
-    const { project } = await createExperience(props.orgId, { name: name.value, output: output.value, first: first.value || null })
+    const { project, firstKey } = await createExperience(props.orgId, { name: name.value, output: output.value, first: first.value || null })
     invalidateQueries('projects')
-    await router.push(`/experiences/${project.id}`)
+    // With a first activity it opens on that activity, ready to fill in; without, on the visit.
+    await router.push(firstKey ? `/experiences/${project.id}/step/${firstKey}` : `/experiences/${project.id}`)
   } catch (e) {
     error.value = describeError(e)
   } finally {
@@ -63,27 +72,37 @@ async function create() {
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-40 flex items-start justify-center px-6 py-10">
-      <div class="absolute inset-0 bg-[rgba(17,24,39,.55)]" @click="close" />
+    <div
+      class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#0b1020]/50 p-4 backdrop-blur-[2px] sm:p-10"
+      @click.self="close"
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="New experience"
-        class="relative flex max-h-full w-full max-w-[52rem] flex-col rounded-[.75rem] bg-white shadow-[0_20px_50px_rgba(17,24,39,.35)]"
+        class="dialog-in w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-2xl"
       >
-        <div class="flex items-start justify-between gap-3 border-b border-border px-8 py-5">
-          <div>
-            <div class="text-[10px] font-extrabold uppercase tracking-overline text-muted-foreground">New experience</div>
-            <div class="text-[17px] font-extrabold leading-tight">Create an experience</div>
-          </div>
-          <button type="button" title="Close" class="rounded-sm p-1.5 text-muted-foreground hover:bg-surface-2" @click="close">
-            <AIcon name="x" cls="h-4 w-4" />
+        <div class="flex items-center gap-3 px-7 pb-2 pt-6">
+          <h2 class="flex-1 text-[18px] font-extrabold">Create an experience</h2>
+          <button
+            type="button"
+            title="Close"
+            aria-label="Close"
+            class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2"
+            @click="close"
+          >
+            <AIcon name="x" cls="h-5 w-5" />
           </button>
         </div>
 
-        <div class="min-h-0 flex-1 space-y-7 overflow-y-auto px-8 py-7">
+        <div class="space-y-9 p-7 pt-5">
           <section>
-            <label for="new-name" class="mb-2 block text-[13px] font-extrabold">Name</label>
+            <div class="mb-4 flex items-start gap-3.5">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[13.5px] font-extrabold text-white">{{ steps.name }}</span>
+              <div class="pt-1">
+                <label for="new-name" class="text-[15px] font-extrabold leading-snug">Name</label>
+              </div>
+            </div>
             <input
               id="new-name"
               ref="nameEl"
@@ -96,71 +115,90 @@ async function create() {
           </section>
 
           <section>
-            <div class="text-[13px] font-extrabold">Where does it play?</div>
-            <p class="mb-3 mt-0.5 text-[12px] text-muted-foreground">
-              Chosen once. The media you pick later depends on it, so it can't be changed afterwards.
-            </p>
+            <div class="mb-4 flex items-start gap-3.5">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[13.5px] font-extrabold text-white">{{ steps.output }}</span>
+              <div class="pt-1">
+                <h3 class="text-[15px] font-extrabold leading-snug">Where does it play?</h3>
+                <p class="mt-1 text-[13.5px] text-muted-foreground">
+                  Chosen once. The media you pick later depends on it, so it can't be changed afterwards.
+                </p>
+              </div>
+            </div>
             <div class="grid gap-3 sm:grid-cols-2">
               <button
                 v-for="o in Object.values(OUTPUTS)"
                 :key="o.id"
                 type="button"
-                class="flex flex-col items-start rounded-lg border-2 p-4 text-left transition-colors"
-                :class="output === o.id ? 'border-brand-deep bg-brand-deep/[.04]' : 'border-border hover:border-brand-deep'"
+                class="flex flex-col items-start gap-3 rounded-lg border p-5 text-left transition-colors"
+                :class="output === o.id ? 'border-brand-deep bg-brand-deep/[.05]' : 'border-border hover:border-brand-deep/50'"
                 @click="output = o.id"
               >
-                <span class="flex items-center gap-2.5">
-                  <span class="flex h-9 w-9 items-center justify-center rounded-md bg-surface-2 text-brand-deep">
-                    <AIcon :name="o.icon" cls="h-5 w-5" />
+                <span class="flex w-full items-center gap-3">
+                  <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ede7f6] text-brand-deep">
+                    <AIcon :name="o.icon" cls="h-6 w-6" />
                   </span>
-                  <span class="text-[14px] font-extrabold">{{ o.name }}</span>
-                  <span v-if="output === o.id" class="text-brand-deep"><AIcon name="check" cls="h-4 w-4" /></span>
+                  <span class="flex-1 text-[14px] font-extrabold" :class="{ 'text-brand-deep': output === o.id }">{{ o.name }}</span>
+                  <span
+                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
+                    :class="output === o.id ? 'border-brand-deep' : 'border-input'"
+                  >
+                    <span v-if="output === o.id" class="h-3 w-3 rounded-full bg-brand-deep" />
+                  </span>
                 </span>
-                <span class="mt-2 text-[12.5px] leading-relaxed text-secondary-foreground">{{ o.blurb }}</span>
+                <span class="text-[13.5px] leading-relaxed text-secondary-foreground">{{ o.blurb }}</span>
               </button>
             </div>
           </section>
 
           <section>
-            <div class="text-[13px] font-extrabold">
-              First activity <span class="font-bold text-muted-foreground">(optional)</span>
+            <div class="mb-4 flex items-start gap-3.5">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[13.5px] font-extrabold text-white">{{ steps.first }}</span>
+              <div class="pt-1">
+                <h3 class="text-[15px] font-extrabold leading-snug">
+                  First activity <span class="text-[13.5px] font-semibold text-muted-foreground">(optional)</span>
+                </h3>
+                <p class="mt-1 text-[13.5px] text-muted-foreground">
+                  What the visitor does after the welcome. You can add more, or change it, on the experience page.
+                </p>
+              </div>
             </div>
-            <p class="mb-3 mt-0.5 text-[12px] text-muted-foreground">
-              What the visitor does after the welcome. You can add more, or change it, on the experience page.
-            </p>
-            <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div class="grid gap-2.5 sm:grid-cols-2">
               <button
                 v-for="t in tiles"
                 :key="t.id"
                 type="button"
-                class="flex items-center gap-2.5 rounded-md border-2 px-3 py-2.5 text-left text-[13px] font-extrabold transition-colors"
-                :class="first === t.id ? 'border-brand-deep bg-brand-deep/[.04] text-brand-deep' : 'border-border hover:border-brand-deep'"
+                class="flex items-center gap-3.5 rounded-lg border p-3.5 text-left transition-colors"
+                :class="first === t.id ? 'border-brand-deep bg-brand-deep/[.05]' : 'border-border hover:border-brand-deep/50'"
                 @click="first = t.id"
               >
-                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 text-brand-deep">
-                  <AIcon :name="t.icon" cls="h-3.5 w-3.5" />
+                <span
+                  class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                  :style="{ color: toneOf(t.id || 'none')[0], background: toneOf(t.id || 'none')[1] }"
+                >
+                  <AIcon :name="t.icon" cls="h-5 w-5" />
                 </span>
-                <span class="min-w-0 flex-1 truncate">{{ t.name }}</span>
-                <span v-if="first === t.id" class="shrink-0"><AIcon name="check" cls="h-4 w-4" /></span>
+                <span class="min-w-0 flex-1 text-[14px] font-extrabold" :class="{ 'text-brand-deep': first === t.id }">{{ t.name }}</span>
+                <span v-if="first === t.id" class="shrink-0 text-brand-deep"><AIcon name="check" cls="h-5 w-5" /></span>
               </button>
             </div>
           </section>
 
-          <p v-if="error" class="rounded-sm bg-destructive/[.06] px-3 py-2 text-[12.5px] font-bold text-destructive">
+          <p v-if="error" class="rounded-sm bg-destructive/[.06] px-3 py-2 text-[13px] font-bold text-destructive">
             {{ error }}
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border px-8 py-4">
-          <span class="text-[12px] text-muted-foreground">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-t border-border px-7 py-5">
+          <span class="text-[13.5px] text-muted-foreground">
             {{ first ? `Opens with the ${template(first).name} ready to fill in.` : 'Opens on the visit, starting with how it starts.' }}
           </span>
-          <span class="flex items-center gap-2">
+          <span class="flex flex-wrap gap-3">
             <button type="button" :class="btnOutline" :disabled="busy" @click="close">Cancel</button>
-            <button type="button" :disabled="!ok" :class="[btnPrimary, 'px-5']" @click="create">Create experience</button>
+            <button type="button" :disabled="!ok" :class="btnDeep" @click="create">Create experience</button>
           </span>
         </div>
       </div>
     </div>
   </Teleport>
 </template>
+

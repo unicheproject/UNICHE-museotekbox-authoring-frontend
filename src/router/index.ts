@@ -22,15 +22,20 @@ export function createAppRouter() {
     routes: [
       { path: '/login', name: 'login', component: Login, meta: { public: true } },
       { path: '/', name: 'dashboard', component: Dashboard },
-      { path: '/experiences', name: 'experiences', component: Experiences },
+      // wide: on a large monitor the list uses the whole width instead of the usual 1180px.
+      { path: '/experiences', name: 'experiences', component: Experiences, meta: { wide: true } },
       // Must come before '/experiences/:projectId' so 'new' and 'deleted' are not captured as
       // project ids. 'new' is the list with the New experience dialog open over it.
-      { path: '/experiences/new', name: 'experience-new', component: Experiences },
+      { path: '/experiences/new', name: 'experience-new', component: Experiences, meta: { wide: true } },
       { path: '/experiences/deleted', name: 'experiences-deleted', component: DeletedExperiences },
-      { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail },
+      { path: '/experiences/:projectId', name: 'experience', component: ExperienceDetail, meta: { wide: true } },
       // The same page with one step in the panel, or one of its dialogs open over the flow.
       { path: '/experiences/:projectId/step/:key', name: 'experience-step', component: ExperienceDetail },
       { path: '/experiences/:projectId/link/:key', name: 'experience-link', component: ExperienceDetail },
+      { path: '/experiences/:projectId/step/:key/q/:n', name: 'experience-question', component: ExperienceDetail },
+      { path: '/experiences/:projectId/settings', name: 'experience-settings', component: ExperienceDetail },
+      { path: '/experiences/:projectId/comments', name: 'experience-comments', component: ExperienceDetail },
+      { path: '/experiences/:projectId/comments/:key', name: 'experience-comments-step', component: ExperienceDetail },
       { path: '/experiences/:projectId/add', name: 'experience-add', component: ExperienceDetail },
       { path: '/experiences/:projectId/test', name: 'experience-test', component: ExperienceDetail },
       { path: '/experiences/:projectId/publish', name: 'experience-publish', component: ExperienceDetail },

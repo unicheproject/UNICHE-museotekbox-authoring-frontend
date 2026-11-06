@@ -1,29 +1,46 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { hasDisplay, template, type Authoring, type Cfg, type TemplateField } from '@/lib/authoring/engine'
-import { inputCls } from '@/lib/authoring/html'
-import AField from './AField.vue'
+import { hasDisplay, mediaOf, template, type Authoring, type Cfg, type TemplateField } from '@/lib/authoring/engine'
 import AIcon from './AIcon.vue'
-import MediaPicker from './MediaPicker.vue'
-import SectionHead from './SectionHead.vue'
-import TypeSelect from './TypeSelect.vue'
+import Choice from './ui/Choice.vue'
+import MediaField from './ui/MediaField.vue'
+import MoreSettings from './ui/MoreSettings.vue'
+import MoveOnCard from './ui/MoveOnCard.vue'
+import QCard from './ui/QCard.vue'
+import ScanField from './ui/ScanField.vue'
+import Seconds from './ui/Seconds.vue'
+import Sub from './ui/Sub.vue'
+import { addBtn, bigInput, btnOutline, rowRemove } from './ui/styles'
 
 /**
- * What an activity other than the Quiz asks for: its fields in order, one section
- * each — a line of text, a number, a choice, an object, what it opens and closes with, and lists
- * of rows (objects and their stories, clues, chapters).
+ * The page of an activity other than the Quiz, one numbered card per question: what it opens with,
+ * its rows in order (chapters, objects and their stories, clues), how it moves along, and when the
+ * visitor moves on to the next step. The rare settings are folded under "More settings".
  */
-const props = defineProps<{ a: Authoring; templateId: string; cfg: Cfg }>()
-const emit = defineEmits<{ change: [] }>()
+const props = defineProps<{ a: Authoring; templateId: string; cfg: Cfg; stepKey: string }>()
+const emit = defineEmits<{ change: []; advanced: [] }>()
 
-const fields = computed(() => template(props.templateId).fields)
+const t = computed(() => template(props.templateId))
+const display = computed(() => hasDisplay(props.a))
+const field = (type: string) => t.value.fields.find((f) => f.type === type)
+const list = computed(() => field('list'))
+const opening = computed(() => field('opening'))
+const closing = computed(() => field('closing'))
+/** The Guided story moves from chapter to chapter by a card or on its own. */
+const advance = computed(() => t.value.fields.find((f) => f.key === 'advance'))
+const byCard = computed(() => props.cfg.advance === 'Scanning a card')
+const hasFinish = computed(() => 'finish' in props.cfg)
+const word = computed(() => list.value?.itemLabel ?? 'Item')
 
 function set(key: string, value: unknown) {
   props.cfg[key] = value
   emit('change')
 }
 function setCell(key: string, i: number, col: string, value: string) {
-  props.cfg[key][i][col] = value
+  const row = props.cfg[key][i]
+  row[col] = value
+  // A chapter's "Shows" follows the file chosen for it.
+  if (col === 'file' && 'media' in row) row.media = mediaOf(value)?.kind === 'VIDEO' ? 'Video' : 'Image'
   emit('change')
 }
 function addRow(f: TemplateField) {
@@ -36,134 +53,107 @@ function delRow(key: string, i: number) {
   props.cfg[key].splice(i, 1)
   emit('change')
 }
-const val = (e: Event) => (e.target as HTMLInputElement).value
+const rowMissing = (f: TemplateField, row: Cfg) => !row.file || ((f.columns || []).some((c) => c.type === 'scan') && !row.scan)
+const hasScan = (f: TemplateField) => (f.columns || []).some((c) => c.type === 'scan')
 
-const cellLabel = 'mb-1 block text-[10px] font-bold uppercase tracking-overline text-muted-foreground'
+/** The numbers of the cards, in the order they are shown. */
+const numbers = computed(() => {
+  let n = 0
+  return {
+    opening: opening.value && !opening.value.settings ? ++n : 0,
+    scenes: props.templateId === 'scratch' ? ++n : 0,
+    list: list.value ? ++n : 0,
+    advance: advance.value ? ++n : 0,
+    finish: hasFinish.value ? ++n : 0,
+    next: ++n,
+  }
+})
 </script>
 
 <template>
-  <div v-for="(f, i) in fields" :key="f.key" :class="i ? 'mt-6 border-t border-border pt-6' : ''">
-    <AField v-if="f.type === 'text'" :label="f.label">
-      <input :value="cfg[f.key] ?? ''" :class="inputCls" @input="set(f.key, val($event))" />
-    </AField>
+  <QCard
+    v-if="opening && numbers.opening"
+    :n="numbers.opening"
+    :title="opening.label"
+    optional
+  >
+    <MediaField v-if="display" kind="VISUAL" :model-value="cfg.openingMedia" @update:model-value="set('openingMedia', $event)" />
+    <MediaField v-else kind="AUDIO" :model-value="cfg.openingAudio" @update:model-value="set('openingAudio', $event)" />
+  </QCard>
 
-    <AField v-else-if="f.type === 'number'" :label="f.label">
-      <input
-        type="number"
-        min="0"
-        :value="cfg[f.key] ?? ''"
-        placeholder="—"
-        :class="[inputCls, 'max-w-[10rem]']"
-        @input="set(f.key, val($event))"
-      />
-    </AField>
+  <QCard v-if="numbers.scenes" :n="numbers.scenes" title="Its scenes">
+    <button type="button" :class="btnOutline" @click="emit('advanced')">Open in Scenes and rules<AIcon name="arrow" /></button>
+  </QCard>
 
-    <AField v-else-if="f.type === 'select'" :label="f.label">
-      <select :value="cfg[f.key]" :class="[inputCls, 'max-w-md']" @change="set(f.key, val($event))">
-        <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
-      </select>
-    </AField>
-
-    <AField v-else-if="f.type === 'scan'" :label="f.label">
-      <TypeSelect :types="a.scanTypes" :model-value="cfg[f.key]" cls="max-w-sm" @update:model-value="set(f.key, $event)" />
-    </AField>
-
-    <!-- Every activity opens the same way: something to look at or listen to. -->
-    <template v-else-if="f.type === 'opening'">
-      <SectionHead :title="f.label" :help="f.help" />
-      <div class="max-w-xl">
-        <AField v-if="hasDisplay(a)" label="Shown on the screen">
-          <MediaPicker kind="VISUAL" :model-value="cfg.openingMedia ?? ''" @update:model-value="set('openingMedia', $event)" />
-        </AField>
-        <AField v-else label="Played on the Box">
-          <MediaPicker kind="AUDIO" :model-value="cfg.openingAudio ?? ''" @update:model-value="set('openingAudio', $event)" />
-        </AField>
-      </div>
-    </template>
-
-    <template v-else-if="f.type === 'closing'">
-      <SectionHead :title="f.label" help="The last screen of this activity. How long it stays is set on the line after it." />
-      <div class="grid gap-4 sm:grid-cols-2">
-        <AField v-if="hasDisplay(a)" label="Shown on the screen">
-          <MediaPicker kind="VISUAL" :model-value="cfg.closingMedia ?? ''" @update:model-value="set('closingMedia', $event)" />
-        </AField>
-        <AField v-else label="Played on the Box">
-          <MediaPicker kind="AUDIO" :model-value="cfg.closingAudio ?? ''" @update:model-value="set('closingAudio', $event)" />
-        </AField>
-        <AField
-          v-if="'finish' in cfg"
-          label="Object that ends this activity"
-          help="The visitor places it when they have seen enough."
-        >
-          <TypeSelect :types="a.scanTypes" :model-value="cfg.finish" @update:model-value="set('finish', $event)" />
-        </AField>
-      </div>
-    </template>
-
-    <template v-else-if="f.type === 'list'">
-      <SectionHead :title="f.label" />
-      <div class="space-y-2">
-        <div
-          v-for="(row, r) in cfg[f.key]"
-          :key="r"
-          class="flex items-start gap-2 rounded-md border border-border bg-surface-2/60 p-2.5"
-        >
-          <span
-            class="mt-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-pill bg-white text-[11px] font-extrabold text-brand-deep shadow-xs"
-          >
-            {{ r + 1 }}
-          </span>
-          <div class="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
-            <label v-for="c in f.columns" :key="c.key" class="block" :class="c.type === 'media' ? 'sm:col-span-2' : ''">
-              <span :class="cellLabel">{{ c.type === 'media' && !hasDisplay(a) ? 'Recording' : c.label }}</span>
-              <MediaPicker
-                v-if="c.type === 'media'"
-                :kind="hasDisplay(a) ? 'VISUAL' : 'AUDIO'"
-                cls="py-1.5 text-[13px]"
-                :model-value="row[c.key] ?? ''"
-                @update:model-value="setCell(f.key, r, c.key, $event)"
-              />
-              <TypeSelect
-                v-else-if="c.type === 'scan'"
-                :types="a.scanTypes"
-                :model-value="row[c.key]"
-                cls="py-1.5 text-[13px]"
-                @update:model-value="setCell(f.key, r, c.key, $event)"
-              />
-              <select
-                v-else-if="c.type === 'select'"
-                :value="row[c.key]"
-                :class="[inputCls, 'py-1.5 text-[13px]']"
-                @change="setCell(f.key, r, c.key, val($event))"
-              >
-                <option v-for="o in c.options" :key="o" :value="o">{{ o }}</option>
-              </select>
-              <input
-                v-else
-                :value="row[c.key] ?? ''"
-                :placeholder="c.placeholder || ''"
-                :class="[inputCls, 'py-1.5 text-[13px]']"
-                @input="setCell(f.key, r, c.key, val($event))"
-              />
-            </label>
+  <QCard v-if="list" :n="numbers.list" :title="`The ${word.toLowerCase()}s, in order`" id="items">
+    <div class="space-y-3">
+      <div
+        v-for="(row, r) in cfg[list.key]"
+        :key="r"
+        :id="`f-item-${r}`"
+        class="rounded-md border p-3 sm:p-4"
+        :class="rowMissing(list, row) ? 'border-amber-300' : 'border-border'"
+      >
+        <div class="mb-3 flex items-center gap-2 sm:gap-3">
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[13.5px] font-extrabold">{{ r + 1 }}</span>
+          <input
+            :value="row.label ?? ''"
+            :placeholder="`${word} title`"
+            :class="[bigInput, '!py-2.5']"
+            @input="setCell(list.key, r, 'label', ($event.target as HTMLInputElement).value)"
+          />
+          <button type="button" :class="rowRemove" @click="delRow(list.key, r)">Remove</button>
+        </div>
+        <div class="space-y-4">
+          <div v-if="hasScan(list)">
+            <Sub title="Its scan" />
+            <ScanField :types="a.scanTypes" :model-value="row.scan" @update:model-value="setCell(list.key, r, 'scan', $event)" />
           </div>
-          <button
-            type="button"
-            title="Remove"
-            class="mt-1.5 rounded-sm p-1.5 text-muted-foreground hover:bg-white hover:text-destructive"
-            @click="delRow(f.key, r)"
-          >
-            <AIcon name="trash" cls="h-4 w-4" />
-          </button>
+          <MediaField
+            :kind="display ? 'VISUAL' : 'AUDIO'"
+            :model-value="row.file"
+            @update:model-value="setCell(list.key, r, 'file', $event)"
+          />
         </div>
       </div>
-      <button
-        type="button"
-        class="mt-2 flex items-center gap-1.5 rounded-md border border-dashed border-input px-3 py-2 text-[12px] font-bold text-brand-deep hover:border-brand-deep hover:bg-brand-deep/[.04]"
-        @click="addRow(f)"
-      >
-        <AIcon name="plus" cls="h-3.5 w-3.5" /> Add {{ f.itemLabel?.toLowerCase() }}
-      </button>
-    </template>
-  </div>
+    </div>
+    <button type="button" :class="[addBtn, 'mt-3']" @click="addRow(list)">
+      <AIcon name="plus" cls="h-5 w-5" />Add a {{ word.toLowerCase() }}
+    </button>
+  </QCard>
+
+  <QCard
+    v-if="advance"
+    :n="numbers.advance"
+    title="How does the visitor go to the next chapter?"
+    id="story-card"
+    :miss="byCard && !cfg.card"
+  >
+    <div class="grid gap-3 sm:grid-cols-2">
+      <Choice :on="byCard" icon="scan" label="By placing a scan" @pick="set('advance', advance.options![0])" />
+      <Choice :on="!byCard" icon="timer" label="On its own" @pick="set('advance', advance.options![1])" />
+    </div>
+    <div class="mt-5">
+      <ScanField v-if="byCard" :types="a.scanTypes" :model-value="cfg.card" @update:model-value="set('card', $event)" />
+      <template v-else>
+        <Sub title="Each chapter stays for" />
+        <Seconds :model-value="cfg.seconds" @update:model-value="set('seconds', $event)" />
+      </template>
+    </div>
+  </QCard>
+
+  <QCard v-if="hasFinish" :n="numbers.finish" title="Which scan ends it?" id="finish" :miss="!cfg.finish">
+    <p class="-mt-2 mb-4 text-[13.5px] text-muted-foreground">The visitor places it when they have seen enough.</p>
+    <ScanField :types="a.scanTypes" :model-value="cfg.finish" @update:model-value="set('finish', $event)" />
+  </QCard>
+
+  <MoveOnCard :a="a" :from-key="stepKey" :n="numbers.next" @change="emit('change')" />
+
+  <MoreSettings v-if="closing || (opening && opening.settings)">
+    <div v-if="closing">
+      <Sub :title="templateId === 'guided' ? 'A closing screen after the last chapter' : closing.label" optional />
+      <MediaField v-if="display" kind="VISUAL" :model-value="cfg.closingMedia" @update:model-value="set('closingMedia', $event)" />
+      <MediaField v-else kind="AUDIO" :model-value="cfg.closingAudio" @update:model-value="set('closingAudio', $event)" />
+    </div>
+  </MoreSettings>
 </template>
