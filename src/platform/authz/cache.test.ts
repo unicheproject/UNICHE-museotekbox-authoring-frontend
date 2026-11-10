@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vite-plus/test'
 import { AuthorizationCache, type AuthorizationFetchResult } from './cache'
 import type { AuthorizationContext } from './types'
 

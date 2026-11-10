@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test'
 import { effectScope, nextTick, ref } from 'vue'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { clearQueryCache, fetchQuery, invalidateQueries, setQueryData, useMutation, useQuery } from './useQuery'

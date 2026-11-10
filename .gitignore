@@ -16,3 +16,4 @@ dist/
 
 # Personal notes / reports (never committed)
 notes/
+.vitest/
