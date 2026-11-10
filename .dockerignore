@@ -5,5 +5,9 @@ dist
 .env.*
 !.env.example
 *.log
+coverage
+.vitest
+notes
+.zed
 .vscode
 .idea

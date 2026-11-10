@@ -18,17 +18,18 @@ services:
     environment:
       # These are baked into /config.js at start and consumed by the BROWSER.
       # IDP_URL must equal the issuer the Museotek Box Backend validates (issuer-consistency rule).
-      IDP_URL: ${IDP_URL:-https://idp.uniche-eccch.eu}
+      # IDP_URL and BACKEND_URL have no default: the container refuses to start without them.
+      IDP_URL: ${IDP_URL:?set IDP_URL in .env}
       REALM: ${REALM:-uniche}
       CLIENT_ID: ${CLIENT_ID:-museotek-box-web}
       AUDIENCE: ${AUDIENCE:-uniche-platform}
-      BACKEND_URL: ${BACKEND_URL:-http://localhost:8080}
+      BACKEND_URL: ${BACKEND_URL:?set BACKEND_URL in .env}
     ports:
-      - "${FRONTEND_PORT:-8083}:80"
+      - "${FRONTEND_PORT:-8083}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
