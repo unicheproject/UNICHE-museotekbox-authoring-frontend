@@ -26,8 +26,8 @@ identity/authorization adapter almost verbatim.
 - **v1 scope is intentionally narrow**: authentication, the authorization dashboard, and experience
   create/edit/soft-delete. No organisation management screens, no invitations, no branding images.
   Don't add these without confirming scope first — they were deliberately deferred.
-- **Version pinning is deliberate.** Exact versions in `package.json`; commit `package-lock.json`
-  once generated.
+- **Version pinning is deliberate.** Exact versions in `package.json`; `pnpm-lock.yaml` is the only
+  lockfile; Node is pinned in `.node-version`, pnpm in `packageManager`.
 
 ## Layout
 - `src/platform/auth/` — wraps `keycloak-js`: PKCE login/logout, in-memory token store, silent
@@ -48,12 +48,13 @@ identity/authorization adapter almost verbatim.
 - `src/config.ts` — reads runtime config injected into `/config.js` at container start.
 
 ## Commands
+Install Vite+ first (https://viteplus.dev/guide/): `vp` provides the pinned Node and pnpm.
 ```bash
-npm install
-npm run dev        # Vite dev server, HMR, port 5173
-npm run build      # vue-tsc type-check (--noEmit) then vite build
-npm run test        # Vitest: can() rule + cache TTL/ETag + slugify
-npm run test:watch
+vp install
+vp dev             # Vite dev server, HMR, port 5173
+vp run build       # vue-tsc type-check (--noEmit) then vite build; plain `vp build` skips vue-tsc
+vp test            # Vitest: can() rule + cache TTL/ETag + slugify
+vp test watch
 ```
 Requires the Museotek Box Backend running and reachable, and a Keycloak client `museotek-box-web`
 registered in the `uniche` realm at `https://idp.uniche-eccch.eu` — see DEPLOYMENT.md §2a for the
@@ -66,5 +67,5 @@ rebuild. `IDP_URL` must equal the issuer the Museotek Box Backend validates agai
 `.env.example` and `DEPLOYMENT.md`.
 
 ## Tech
-Vue 3.5 + TS, Vite 6, Vue Router 4.5, Pinia 2.3, keycloak-js 26.1, axios 1.7, Tailwind 3.4,
-reka-ui. Node `>=22.13.0 <23`.
+Vue 3.5 + TS, Vite+ 1.5 (Vite 8, Vitest 5), Vue Router 4.5, Pinia 2.3, keycloak-js 26.1, axios 1.7, Tailwind 3.4,
+reka-ui. Node 26 (`.node-version`), pnpm 11.

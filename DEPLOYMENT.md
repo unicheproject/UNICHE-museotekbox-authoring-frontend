@@ -63,10 +63,10 @@ The `museotek-box-web` client's origin allowlist is per-origin, not per-app — 
 serve this SPA from needs its own entry, same as the staging URL above. Currently in the
 production realm:
 
-- `http://localhost:5173/*` (Vite dev server, `npm run dev`) — **registered, confirmed working**
+- `http://localhost:5173/*` (Vite dev server, `vp dev`) — **registered, confirmed working**
 - `http://localhost:8083/*` (Docker Compose default, `FRONTEND_PORT=8083`) — **not yet registered**;
   add it (and the matching web origin `http://localhost:8083`) only if you need to test login via
-  the containerised build rather than `npm run dev`
+  the containerised build rather than `vp dev`
 
 This is exactly what "Invalid parameter: redirect_uri" means if you hit it locally: the origin
 you're serving from isn't in the client's allowlist yet. Add both the redirect URI and the web

@@ -28,14 +28,16 @@ the same platform rule locally via `can()` for UX gating — always re-enforced 
 
 ## Run order (local dev)
 
+Install Vite+ first (https://viteplus.dev/guide/): `vp` provides the pinned Node and pnpm.
+
 ```bash
-npm install
-npm run dev        # serves on port 5173 (HMR)
+vp install
+vp dev             # serves on port 5173 (HMR)
 ```
 
 Requires the Museotek Box Backend running and reachable (default `http://localhost:8080`, context
 path `/museotekbox`), and a Keycloak client `museotek-box-web` registered in the `uniche` realm at
-`https://idp.uniche-eccch.eu`. For `npm run dev` (port 5173) the redirect URI is already registered
+`https://idp.uniche-eccch.eu`. For `vp dev` (port 5173) the redirect URI is already registered
 and confirmed working; for the Dockerised build (port 8083) it isn't yet — see DEPLOYMENT.md §2a
 for the exact values and how to add them.
 
@@ -73,12 +75,12 @@ Kept free of Vue-specific imports, copied verbatim from `UNICHEportal`.
 ## Tests
 
 ```bash
-npm run test     # Vitest: can() rule (admin/manager/member/deny), the TTL/ETag cache, slugify
+vp test          # Vitest: can() rule (admin/manager/member/deny), the TTL/ETag cache, slugify
 ```
 
 ## Tech & pinning
 
-Vue 3.5 + TS, Vite 6, Vue Router 4.5, Pinia 2.3, keycloak-js 26.1, axios 1.7; UI = shadcn-vue-style
-components (built on reka-ui) + Tailwind 3.4. Exact versions in `package.json`; `package-lock.json`
-should be committed once `npm install` has run; `engines.node` set. Docker images pinned by tag —
+Vue 3.5 + TS, Vite+ 1.5 (Vite 8, Vitest 5), Vue Router 4.5, Pinia 2.3, keycloak-js 26.1, axios 1.7; UI = shadcn-vue-style
+components (built on reka-ui) + Tailwind 3.4. Exact versions in `package.json`; `pnpm-lock.yaml`
+is the only lockfile; Node pinned in `.node-version`, pnpm in `packageManager`. Docker images pinned by tag —
 pin by `@sha256` digest too on first real build (see `docker/Dockerfile`).
