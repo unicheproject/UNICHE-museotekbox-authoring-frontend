@@ -88,7 +88,7 @@ function line(q: Cfg) {
         :key="i"
         class="flex items-center gap-2 rounded-md border p-3 pr-3 hover:border-brand-deep"
         :class="[
-          questionGaps(a, q).length ? 'border-amber-300' : isInfo(q) ? 'border-[#d9ccf0]' : 'border-border',
+          isInfo(q) ? 'border-[#d9ccf0]' : 'border-border',
           isInfo(q) ? 'bg-[#f7f3fd]' : 'bg-white',
         ]"
       >

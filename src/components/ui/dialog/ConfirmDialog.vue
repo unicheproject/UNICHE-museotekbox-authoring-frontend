@@ -55,19 +55,22 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <!-- z-[70]: a confirm is often raised from inside another dialog (z-[60]) and must sit above it. -->
+    <div v-if="open" class="dialog-overlay fixed inset-0 z-[70] flex items-center justify-center p-4">
       <!-- Backdrop: a click cancels (unless a confirm is in flight). -->
-      <div class="fixed inset-0 bg-black/50" @click="cancel" />
+      <div class="fixed inset-0 bg-[#0b1020]/50 backdrop-blur-[2px]" @click="cancel" />
       <div
         role="alertdialog"
         aria-modal="true"
         :aria-label="title"
-        class="relative z-10 w-full max-w-md rounded-lg border bg-background p-6 shadow-lg"
+        class="dialog-in relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-lg bg-background shadow-2xl"
       >
-        <h2 class="text-lg font-extrabold tracking-[-0.01em]">{{ title }}</h2>
-        <p v-if="description" class="mt-2 text-sm text-muted-foreground">{{ description }}</p>
-        <p v-if="error" role="alert" class="mt-4 text-sm text-destructive">{{ error }}</p>
-        <div class="mt-6 flex justify-end gap-2">
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-2 pt-6">
+          <h2 class="text-[17px] font-extrabold leading-tight">{{ title }}</h2>
+          <p v-if="description" class="mt-2 text-[14px] leading-relaxed text-secondary-foreground">{{ description }}</p>
+          <p v-if="error" role="alert" class="mt-4 rounded-md bg-destructive/[.06] px-3 py-2 text-[13px] font-bold text-destructive">{{ error }}</p>
+        </div>
+        <div class="flex shrink-0 flex-wrap justify-end gap-2 px-6 pb-6 pt-4">
           <Button variant="outline" :disabled="busy" @click="cancel">{{ cancelLabel }}</Button>
           <Button :variant="variant" :disabled="busy" @click="confirm">
             {{ busy ? 'Working…' : confirmLabel }}

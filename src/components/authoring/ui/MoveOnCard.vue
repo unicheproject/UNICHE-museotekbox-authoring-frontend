@@ -25,7 +25,8 @@ function set<K extends keyof Link>(key: K, value: Link[K]) {
   emit('change')
 }
 
-// "Right away" only leaves the Start; "when the video ends" needs a screen to play it on.
+// "Right away" only leaves the Start. "When the video ends" is offered only once there is a video on
+// the screen to wait for; a step already set to it keeps the choice, so its warning stays visible.
 const ways = computed(() =>
   (
     [
@@ -35,7 +36,7 @@ const ways = computed(() =>
       ['scan', 'scan', 'When they place a scan'],
       ['any', 'scan', 'When they place any scan'],
     ] as [LinkHow, string, string][]
-  ).filter(([k]) => (k !== 'now' || props.fromKey === 'start') && (k !== 'video' || hasDisplay(props.a))),
+  ).filter(([k]) => (k !== 'now' || props.fromKey === 'start') && (k !== 'video' || (hasDisplay(props.a) && (info.value.hasVideo || info.value.link.how === 'video')))),
 )
 </script>
 
@@ -50,7 +51,7 @@ const ways = computed(() =>
     <div v-else-if="info.link.how === 'scan'" class="mt-5">
       <ScanField :types="a.scanTypes" :model-value="info.link.scan" @update:model-value="set('scan', $event)" />
     </div>
-    <p v-else-if="info.warn" class="mt-5 flex items-center gap-2.5 rounded-md bg-amber-50 px-4 py-3 text-[13.5px] font-bold text-warning">
+    <p v-else-if="info.warn" class="mt-5 flex items-center gap-2.5 rounded-md bg-warning/[.06] px-4 py-3 text-[13.5px] font-bold text-warning">
       <AIcon name="alert" cls="h-5 w-5" /><span v-html="info.warn" />
     </p>
   </QCard>

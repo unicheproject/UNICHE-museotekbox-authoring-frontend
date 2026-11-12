@@ -5,7 +5,6 @@ import { OUTPUTS, REPLY_KINDS, colorHex, hasDisplay, type Authoring, type ReplyK
 import AIcon from './AIcon.vue'
 import CustomRows from './CustomRows.vue'
 import SwatchRow from './SwatchRow.vue'
-import Crumbs from './ui/Crumbs.vue'
 import MediaField from './ui/MediaField.vue'
 import MoreSettings from './ui/MoreSettings.vue'
 import QCard from './ui/QCard.vue'
@@ -32,9 +31,8 @@ function set(kind: ReplyKind, key: 'text' | 'color' | 'media' | 'audio' | 'boxVi
 </script>
 
 <template>
-  <div class="mx-auto max-w-[760px] min-[1700px]:max-w-[1100px]">
-    <Crumbs :parts="[{ text: 'Experiences', to: '/experiences' }, { text: a.details.name || 'Untitled experience', to: base }, { text: 'Settings' }]" />
-    <h1 class="mb-5 text-2xl font-extrabold tracking-tight">Settings</h1>
+  <div>
+    <h2 class="mb-5 text-xl font-extrabold tracking-tight">Settings</h2>
     <div class="space-y-5">
       <QCard :n="1" title="Name" :miss="!a.details.name.trim()">
         <input :value="a.details.name" aria-label="Name" :class="bigInput" @input="emit('rename', ($event.target as HTMLInputElement).value)" />

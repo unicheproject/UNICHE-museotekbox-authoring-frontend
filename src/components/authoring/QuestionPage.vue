@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   LETTERS,
@@ -34,16 +34,14 @@ import CustomRows from './CustomRows.vue'
 import ScreenPreview from './ScreenPreview.vue'
 import SwatchRow from './SwatchRow.vue'
 import Choice from './ui/Choice.vue'
-import Crumbs from './ui/Crumbs.vue'
 import MediaField from './ui/MediaField.vue'
 import MoreSettings from './ui/MoreSettings.vue'
 import QCard from './ui/QCard.vue'
 import SaveState from './ui/SaveState.vue'
 import ScanField from './ui/ScanField.vue'
 import Seconds from './ui/Seconds.vue'
-import Stepper from './ui/Stepper.vue'
 import Sub from './ui/Sub.vue'
-import { addBtn, bigInput, btnDeep, btnOutline, overlay, rowRemove } from './ui/styles'
+import { addBtn, bigInput, btnDeep, btnOutline, dialogBody, dialogBox, dialogClose, dialogHead, dialogTitle, overlay, rowRemove } from './ui/styles'
 
 /**
  * One question or slide of a quiz on a page of its own: back to the quiz and every item of it in a
@@ -66,6 +64,23 @@ const number = computed(() => questionsOnly(qs.value.slice(0, props.index + 1)).
 const label = (o: Cfg) => (isInfo(o) ? 'Slide' : itemLabel(qs.value, o))
 const quizUrl = computed(() => `${props.base}/step/${props.stepKey}`)
 const goItem = (n: number) => router.push(`${quizUrl.value}/q/${n}`)
+
+// ─── the panel: it opens over the quiz, so the list stays where the author left it
+const panel = ref<HTMLElement | null>(null)
+const close = () => router.push(quizUrl.value)
+function onKey(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  // A picker or confirmation open over the panel closes first.
+  if (choosingScreen.value || picking.value != null || confirming.value) return
+  if (document.querySelector('[role="alertdialog"]')) return
+  close()
+}
+onMounted(async () => {
+  window.addEventListener('keydown', onKey)
+  await nextTick()
+  panel.value?.focus()
+})
+onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 function set(key: string, value: unknown) {
   q.value[key] = value
@@ -193,34 +208,33 @@ function remove() {
 </script>
 
 <template>
-  <div v-if="q" class="mx-auto max-w-[760px] min-[1700px]:max-w-[1100px]">
-    <Crumbs
-      :parts="[
-        { text: 'Experiences', to: '/experiences' },
-        { text: name, to: base },
-        { text: 'Quiz', to: quizUrl },
-        { text: or(q.name, label(q)) },
-      ]"
-    />
-    <Stepper :a="a" :current="stepKey" :base="base" :fixes="fixes" />
-
-    <!-- Back to the quiz, and every item of it, the one you are on filled. -->
-    <div class="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg bg-white px-3 py-3 shadow-xs">
-      <button type="button" :class="[btnOutline, '!py-2']" @click="router.push(quizUrl)"><AIcon name="left" />Quiz</button>
-      <span class="hidden h-7 w-px bg-border sm:block" />
-      <nav aria-label="Questions" class="flex flex-wrap items-center gap-2">
+  <Teleport to="body">
+  <div v-if="q" class="dialog-overlay fixed inset-0 z-50 flex justify-end">
+    <!-- The quiz stays in view behind the panel; a click on it closes the panel. -->
+    <div class="absolute inset-0 bg-[#0b1020]/40 backdrop-blur-[1px]" aria-hidden="true" @click="close" />
+    <section
+      ref="panel"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="info ? 'Edit slide' : 'Edit question'"
+      tabindex="-1"
+      class="panel-in relative flex h-full w-full max-w-[760px] flex-col bg-surface-2 shadow-2xl outline-none"
+    >
+    <!-- Every item of the quiz, the one you are on filled, and the way back to the quiz. -->
+    <header class="flex items-center gap-3 border-b border-border bg-white px-4 py-3 sm:px-6">
+      <nav aria-label="Questions and slides" class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
         <button
           v-for="(o, i) in qs"
           :key="i"
           type="button"
           :title="or(o.name, label(o))"
           :aria-current="i === index ? 'page' : undefined"
-          class="relative flex h-9 min-w-[36px] items-center justify-center rounded-full px-2 text-[13px] font-extrabold transition-shadow"
+          class="relative flex h-9 min-w-[36px] shrink-0 items-center justify-center rounded-full px-2 text-[13px] font-extrabold transition-shadow"
           :class="
             i === index
               ? 'bg-brand-deep text-white ring-4 ring-brand-deep/15'
               : questionGaps(a, o).length
-                ? 'bg-amber-50 text-warning ring-2 ring-amber-300 hover:ring-brand-deep'
+                ? 'bg-warning/[.06] text-warning ring-2 ring-warning/40 hover:ring-brand-deep'
                 : 'bg-white text-secondary-foreground ring-1 ring-border hover:ring-brand-deep'
           "
           @click="goItem(i)"
@@ -229,13 +243,18 @@ function remove() {
           <template v-else>{{ questionsOnly(qs.slice(0, i + 1)).length }}</template>
           <span
             v-if="questionGaps(a, o).length && i !== index"
-            class="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400 text-[9px] font-extrabold text-white ring-2 ring-white"
+            class="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-warning text-[9px] font-extrabold text-white ring-2 ring-white"
             >!</span
           >
         </button>
       </nav>
-    </div>
+      <SaveState :saving="saving" class="hidden sm:flex" />
+      <button type="button" aria-label="Close and go back to the quiz" title="Close" class="shrink-0 rounded-md p-2 text-muted-foreground hover:bg-surface-2 hover:text-foreground" @click="close">
+        <AIcon name="x" cls="h-5 w-5" />
+      </button>
+    </header>
 
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
     <!-- A slide: something to watch or listen to between questions, with no answer. -->
     <template v-if="info">
       <div class="mb-5 flex items-center gap-4">
@@ -244,7 +263,6 @@ function remove() {
           <div class="text-[13.5px] font-bold text-muted-foreground">Slide · no answer needed</div>
           <h1 class="text-2xl font-extrabold leading-tight tracking-tight">{{ or(q.name, 'Untitled slide') }}</h1>
         </div>
-        <SaveState :saving="saving" />
       </div>
       <div class="space-y-5">
         <QCard :n="1" title="Its heading" optional>
@@ -266,10 +284,10 @@ function remove() {
                 <AIcon name="x" cls="h-5 w-5" />
               </button>
             </div>
-            <p v-if="!(q.display || []).length" class="rounded-md border border-dashed border-amber-300 bg-amber-50/60 px-4 py-3 text-[13.5px] font-semibold text-warning">
+            <p v-if="!(q.display || []).length" class="rounded-md border border-dashed border-warning/40 bg-warning/[.04] px-4 py-3 text-[13.5px] font-semibold text-warning">
               Nothing to show yet — add a video, a picture or a drawing.
             </p>
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid gap-3 sm:grid-cols-3">
               <button
                 v-for="t in SHOW"
                 :key="t.type"
@@ -294,7 +312,7 @@ function remove() {
           <div v-if="infoMoveOn(a, q) === 'time'" class="mt-5">
             <Seconds :model-value="q.seconds" @update:model-value="set('seconds', $event)" />
           </div>
-          <p v-else-if="infoMoveOn(a, q) === 'video' && !hasVideo" class="mt-5 flex items-center gap-2.5 rounded-md bg-amber-50 px-4 py-3 text-[13.5px] font-bold text-warning">
+          <p v-else-if="infoMoveOn(a, q) === 'video' && !hasVideo" class="mt-5 flex items-center gap-2.5 rounded-md bg-warning/[.06] px-4 py-3 text-[13.5px] font-bold text-warning">
             <AIcon name="alert" cls="h-5 w-5" />There is no video to wait for — add one, or choose another way to move on.
           </p>
         </QCard>
@@ -313,7 +331,6 @@ function remove() {
           <div class="text-[13.5px] font-bold text-muted-foreground">Question {{ number }} of {{ total }}</div>
           <h1 class="text-2xl font-extrabold leading-tight tracking-tight">{{ or(q.name, 'Untitled question') }}</h1>
         </div>
-        <SaveState :saving="saving" />
       </div>
       <div class="space-y-5">
         <QCard :n="1" title="What do you ask?">
@@ -325,8 +342,8 @@ function remove() {
         </QCard>
         <QCard v-else :n="2" title="What does the visitor see on the screen?" id="q-media" :miss="missMedia">
           <button type="button" class="flex w-full items-center gap-4 rounded-md border border-border bg-white p-3 text-left hover:border-brand-deep" @click="choosingScreen = true">
-            <span v-if="preset" class="w-32 shrink-0"><ScreenPreview :a="a" :s="{ screen: preset.id, answers: answersFor(preset) }" sample /></span>
-            <span v-else class="flex aspect-video w-32 shrink-0 items-center justify-center rounded-[.45rem] bg-surface-2 text-brand-deep"><AIcon name="image" cls="h-6 w-6" /></span>
+            <span v-if="preset" class="w-24 shrink-0 sm:w-32"><ScreenPreview :a="a" :s="{ screen: preset.id, answers: answersFor(preset) }" sample /></span>
+            <span v-else class="flex aspect-video w-24 shrink-0 sm:w-32 items-center justify-center rounded-[.45rem] bg-surface-2 text-brand-deep"><AIcon name="image" cls="h-6 w-6" /></span>
             <span class="min-w-0 flex-1 text-[14px] font-bold">{{ preset ? preset.name : 'My own picture, video or drawing' }}</span>
             <span class="rounded-lg px-3 py-2 text-[13.5px] font-bold text-brand-deep">Change</span>
           </button>
@@ -356,10 +373,10 @@ function remove() {
                     <AIcon name="x" cls="h-5 w-5" />
                   </button>
                 </div>
-                <p v-if="!(q.display || []).length" class="rounded-md border border-dashed border-amber-300 bg-amber-50/60 px-4 py-3 text-[13.5px] font-semibold text-warning">
+                <p v-if="!(q.display || []).length" class="rounded-md border border-dashed border-warning/40 bg-warning/[.04] px-4 py-3 text-[13.5px] font-semibold text-warning">
                   Nothing to show yet — a question is never plain text, it is a picture, a video or a drawing.
                 </p>
-                <div class="grid grid-cols-3 gap-3">
+                <div class="grid gap-3 sm:grid-cols-3">
                   <button
                     v-for="t in SHOW"
                     :key="t.type"
@@ -381,7 +398,7 @@ function remove() {
               v-for="(x, k) in answers"
               :key="k"
               class="rounded-md border p-4"
-              :class="q.right === k ? 'border-success bg-success/[.04]' : !x.scan ? 'border-amber-300' : 'border-border'"
+              :class="q.right === k ? 'border-success bg-success/[.04]' : !x.scan ? 'border-warning/40' : 'border-border'"
             >
               <div class="flex items-center gap-3">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-extrabold text-white" :style="{ background: answerHex(a, x) }">
@@ -518,25 +535,28 @@ function remove() {
       </div>
     </template>
 
-    <div class="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pb-12 pt-6">
-      <button v-if="index > 0" type="button" :class="btnOutline" @click="goItem(index - 1)"><AIcon name="left" />{{ label(qs[index - 1]) }}</button>
+    </div>
+
+    <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-white px-4 py-3 sm:px-6">
+      <button v-if="index > 0" type="button" :class="btnOutline" :title="or(qs[index - 1].name, label(qs[index - 1]))" @click="goItem(index - 1)"><AIcon name="left" />Previous</button>
       <span v-else />
       <div class="flex flex-wrap gap-3">
         <button v-if="index === qs.length - 1" type="button" :class="btnOutline" @click="another"><AIcon name="plus" />Another question</button>
-        <button v-else type="button" :class="btnOutline" @click="goItem(index + 1)">{{ label(qs[index + 1]) }}<AIcon name="arrow" /></button>
-        <button type="button" :class="btnDeep" @click="router.push(quizUrl)">Done</button>
+        <button v-else type="button" :class="btnOutline" :title="or(qs[index + 1].name, label(qs[index + 1]))" @click="goItem(index + 1)">Next<AIcon name="arrow" /></button>
+        <button type="button" :class="btnDeep" @click="close">Done</button>
       </div>
-    </div>
+    </footer>
+    </section>
 
     <!-- Choose the screen: the author's own picture or video, or one of the eight, each drawn small. -->
     <Teleport to="body">
       <div v-if="choosingScreen" :class="overlay" @click.self="choosingScreen = false">
-        <div role="dialog" aria-modal="true" aria-label="Choose the screen" class="dialog-in w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-2xl">
-          <div class="flex items-center gap-3 border-b border-border px-7 py-5">
-            <h2 class="flex-1 text-[16px] font-extrabold">Choose the screen</h2>
-            <button type="button" aria-label="Close" class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2" @click="choosingScreen = false"><AIcon name="x" cls="h-5 w-5" /></button>
+        <div role="dialog" aria-modal="true" aria-label="Choose the screen" :class="[dialogBox, 'max-w-3xl']">
+          <div :class="[dialogHead, 'items-center']">
+            <h2 :class="[dialogTitle, 'min-w-0 flex-1']">Choose the screen</h2>
+            <button type="button" title="Close" aria-label="Close" :class="dialogClose" @click="choosingScreen = false"><AIcon name="x" cls="h-5 w-5" /></button>
           </div>
-          <div class="max-h-[70vh] overflow-y-auto p-7">
+          <div :class="dialogBody">
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <button
                 type="button"
@@ -569,12 +589,12 @@ function remove() {
 
       <!-- Go to: every other item of the quiz, and the end of it. -->
       <div v-if="picking != null" :class="overlay" @click.self="picking = null">
-        <div role="dialog" aria-modal="true" aria-label="Go to" class="dialog-in w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
-          <div class="flex items-center gap-3 border-b border-border px-7 py-5">
-            <h2 class="flex-1 text-[16px] font-extrabold">Go to</h2>
-            <button type="button" aria-label="Close" class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2" @click="picking = null"><AIcon name="x" cls="h-5 w-5" /></button>
+        <div role="dialog" aria-modal="true" aria-label="Go to" :class="[dialogBox, 'max-w-2xl']">
+          <div :class="[dialogHead, 'items-center']">
+            <h2 :class="[dialogTitle, 'min-w-0 flex-1']">Go to</h2>
+            <button type="button" title="Close" aria-label="Close" :class="dialogClose" @click="picking = null"><AIcon name="x" cls="h-5 w-5" /></button>
           </div>
-          <div class="max-h-[70vh] space-y-2.5 overflow-y-auto p-7">
+          <div :class="[dialogBody, 'space-y-2.5']">
             <button
               v-for="(o, n) in qs.filter((x) => x !== q)"
               :key="n"
@@ -615,4 +635,5 @@ function remove() {
       @confirm="remove"
     />
   </div>
+  </Teleport>
 </template>

@@ -7,6 +7,18 @@ import { OUTPUTS, TEMPLATES, template, type OutputId } from '@/lib/authoring/eng
 import { createExperience } from '@/lib/authoring/useAuthoring'
 import { toneOf } from '@/lib/authoring/tone'
 import AIcon from '@/components/authoring/AIcon.vue'
+import {
+  bigInput as inputCls,
+  btnDeep,
+  btnOutline,
+  dialogBody,
+  dialogBox,
+  dialogClose,
+  dialogFoot,
+  dialogHead,
+  dialogTitle,
+  overlay,
+} from '@/components/authoring/ui/styles'
 
 /**
  * Creating an experience: a short dialog over the list. Only what cannot wait — its name and where
@@ -21,12 +33,8 @@ const router = useRouter()
 const tiles = [{ id: '', name: 'Decide later', icon: 'plus' }, ...TEMPLATES]
 const steps = { name: 1, output: 2, first: 3 }
 
-const btnDeep =
-  'inline-flex items-center justify-center gap-2 rounded-md bg-brand-deep px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button text-white hover:bg-brand-deep/90 disabled:cursor-not-allowed disabled:opacity-40'
-const btnOutline =
-  'inline-flex items-center justify-center gap-2 rounded-md border border-input bg-white px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button text-secondary-foreground hover:border-brand-deep hover:text-brand-deep disabled:opacity-40'
-const inputCls =
-  'w-full rounded-md border border-input bg-white px-3 py-2 text-[14px] outline-none focus:border-brand-deep focus:ring-2 focus:ring-brand-deep/20'
+/** Section numbers: quiet, so they don't read as the experience's own step numbers. */
+const num = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-deep/10 text-[12.5px] font-extrabold text-brand-deep'
 
 const name = ref('')
 const output = ref<OutputId>('DISPLAY')
@@ -34,6 +42,11 @@ const first = ref('')
 const busy = ref(false)
 const error = ref<string | null>(null)
 const nameEl = ref<HTMLInputElement | null>(null)
+
+// What happens after Create, so the author knows where they will land.
+const next = computed(() =>
+  first.value ? `Next, you'll fill in the ${template(first.value).name}.` : "Next, you'll set up how the visit starts.",
+)
 
 const ok = computed(() => !!name.value.trim() && !!props.orgId && !busy.value)
 
@@ -72,36 +85,20 @@ async function create() {
 
 <template>
   <Teleport to="body">
-    <div
-      class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#0b1020]/50 p-4 backdrop-blur-[2px] sm:p-10"
-      @click.self="close"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="New experience"
-        class="dialog-in w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-2xl"
-      >
-        <div class="flex items-center gap-3 px-7 pb-2 pt-6">
-          <h2 class="flex-1 text-[18px] font-extrabold">Create an experience</h2>
-          <button
-            type="button"
-            title="Close"
-            aria-label="Close"
-            class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2"
-            @click="close"
-          >
+    <div :class="overlay" @click.self="close">
+      <div role="dialog" aria-modal="true" aria-label="New experience" :class="[dialogBox, 'max-w-3xl']">
+        <div :class="[dialogHead, 'items-center']">
+          <h2 :class="[dialogTitle, 'min-w-0 flex-1']">New experience</h2>
+          <button type="button" title="Close" aria-label="Close" :class="dialogClose" @click="close">
             <AIcon name="x" cls="h-5 w-5" />
           </button>
         </div>
 
-        <div class="space-y-9 p-7 pt-5">
+        <div :class="[dialogBody, 'space-y-8']">
           <section>
-            <div class="mb-4 flex items-start gap-3.5">
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[13.5px] font-extrabold text-white">{{ steps.name }}</span>
-              <div class="pt-1">
-                <label for="new-name" class="text-[15px] font-extrabold leading-snug">Name</label>
-              </div>
+            <div class="mb-3 flex items-center gap-3">
+              <span :class="num">{{ steps.name }}</span>
+              <label for="new-name" class="text-[15px] font-extrabold leading-snug">Name</label>
             </div>
             <input
               id="new-name"
@@ -115,12 +112,12 @@ async function create() {
           </section>
 
           <section>
-            <div class="mb-4 flex items-start gap-3.5">
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[13.5px] font-extrabold text-white">{{ steps.output }}</span>
-              <div class="pt-1">
-                <h3 class="text-[15px] font-extrabold leading-snug">Where does it play?</h3>
-                <p class="mt-1 text-[13.5px] text-muted-foreground">
-                  Chosen once. The media you pick later depends on it, so it can't be changed afterwards.
+            <div class="mb-3 flex items-start gap-3">
+              <span :class="num">{{ steps.output }}</span>
+              <div class="min-w-0 pt-0.5">
+                <h3 class="text-[15px] font-extrabold leading-snug">Where will visitors see and hear it?</h3>
+                <p class="mt-1 text-[13.5px] leading-snug text-secondary-foreground">
+                  This can't be changed later, because the pictures, videos and sounds you add depend on it.
                 </p>
               </div>
             </div>
@@ -129,20 +126,21 @@ async function create() {
                 v-for="o in Object.values(OUTPUTS)"
                 :key="o.id"
                 type="button"
-                class="flex flex-col items-start gap-3 rounded-lg border p-5 text-left transition-colors"
+                :aria-pressed="output === o.id"
+                class="flex flex-col items-start gap-3 rounded-lg border p-4 text-left transition-colors sm:p-5"
                 :class="output === o.id ? 'border-brand-deep bg-brand-deep/[.05]' : 'border-border hover:border-brand-deep/50'"
                 @click="output = o.id"
               >
                 <span class="flex w-full items-center gap-3">
-                  <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#ede7f6] text-brand-deep">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ede7f6] text-brand-deep">
                     <AIcon :name="o.icon" cls="h-6 w-6" />
                   </span>
                   <span class="flex-1 text-[14px] font-extrabold" :class="{ 'text-brand-deep': output === o.id }">{{ o.name }}</span>
                   <span
-                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border"
+                    class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2"
                     :class="output === o.id ? 'border-brand-deep' : 'border-input'"
                   >
-                    <span v-if="output === o.id" class="h-3 w-3 rounded-full bg-brand-deep" />
+                    <span v-if="output === o.id" class="h-2.5 w-2.5 rounded-full bg-brand-deep" />
                   </span>
                 </span>
                 <span class="text-[13.5px] leading-relaxed text-secondary-foreground">{{ o.blurb }}</span>
@@ -151,14 +149,14 @@ async function create() {
           </section>
 
           <section>
-            <div class="mb-4 flex items-start gap-3.5">
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-deep text-[13.5px] font-extrabold text-white">{{ steps.first }}</span>
-              <div class="pt-1">
+            <div class="mb-3 flex items-start gap-3">
+              <span :class="num">{{ steps.first }}</span>
+              <div class="min-w-0 pt-0.5">
                 <h3 class="text-[15px] font-extrabold leading-snug">
                   First activity <span class="text-[13.5px] font-semibold text-muted-foreground">(optional)</span>
                 </h3>
-                <p class="mt-1 text-[13.5px] text-muted-foreground">
-                  What the visitor does after the welcome. You can add more, or change it, on the experience page.
+                <p class="mt-1 text-[13.5px] leading-snug text-secondary-foreground">
+                  What visitors do after the start. You can add more activities later.
                 </p>
               </div>
             </div>
@@ -167,12 +165,13 @@ async function create() {
                 v-for="t in tiles"
                 :key="t.id"
                 type="button"
+                :aria-pressed="first === t.id"
                 class="flex items-center gap-3.5 rounded-lg border p-3.5 text-left transition-colors"
                 :class="first === t.id ? 'border-brand-deep bg-brand-deep/[.05]' : 'border-border hover:border-brand-deep/50'"
                 @click="first = t.id"
               >
                 <span
-                  class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                   :style="{ color: toneOf(t.id || 'none')[0], background: toneOf(t.id || 'none')[1] }"
                 >
                   <AIcon :name="t.icon" cls="h-5 w-5" />
@@ -182,16 +181,13 @@ async function create() {
               </button>
             </div>
           </section>
-
-          <p v-if="error" class="rounded-sm bg-destructive/[.06] px-3 py-2 text-[13px] font-bold text-destructive">
-            {{ error }}
-          </p>
         </div>
 
-        <div class="flex flex-wrap items-center justify-between gap-4 border-t border-border px-7 py-5">
-          <span class="text-[13.5px] text-muted-foreground">
-            {{ first ? `Opens with the ${template(first).name} ready to fill in.` : 'Opens on the visit, starting with how it starts.' }}
-          </span>
+        <div :class="[dialogFoot, 'justify-between']">
+          <p v-if="error" role="alert" class="w-full rounded-md bg-destructive/[.06] px-3 py-2 text-[13px] font-bold text-destructive">
+            {{ error }}
+          </p>
+          <span class="min-w-0 flex-1 basis-56 text-[13.5px] text-secondary-foreground">{{ next }}</span>
           <span class="flex flex-wrap gap-3">
             <button type="button" :class="btnOutline" :disabled="busy" @click="close">Cancel</button>
             <button type="button" :disabled="!ok" :class="btnDeep" @click="create">Create experience</button>
@@ -201,4 +197,3 @@ async function create() {
     </div>
   </Teleport>
 </template>
-

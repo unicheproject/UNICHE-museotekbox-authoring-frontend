@@ -112,7 +112,7 @@ const unusual = computed(() => {
           </span>
           <span
             v-if="summary?.missing"
-            class="inline-flex items-center gap-1 rounded-pill bg-amber-50 px-2 py-0.5 text-[12px] font-bold text-warning ring-1 ring-amber-200"
+            class="inline-flex items-center gap-1 rounded-pill bg-warning/[.06] px-2 py-0.5 text-[12px] font-bold text-warning ring-1 ring-warning/25"
           >
             <AlertTriangle class="h-3 w-3" />{{ summary.missing }} missing
           </span>

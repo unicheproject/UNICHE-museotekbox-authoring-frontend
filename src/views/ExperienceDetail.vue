@@ -11,6 +11,8 @@ import { fetchShared, invalidate } from '@/lib/queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import AddActivityDialog from '@/components/authoring/AddActivityDialog.vue'
 import StepFrame from '@/components/authoring/StepFrame.vue'
+import ExperienceHeader from '@/components/authoring/ExperienceHeader.vue'
+import VisitPath from '@/components/authoring/ui/VisitPath.vue'
 import VisitPage from '@/components/authoring/VisitPage.vue'
 import QuizForm from '@/components/authoring/QuizForm.vue'
 import QuestionPage from '@/components/authoring/QuestionPage.vue'
@@ -25,8 +27,9 @@ import ScenesRules from '@/components/authoring/ScenesRules.vue'
 
 /**
  * The experience page: the visit as one numbered list, top to bottom — Start, the activities, End —
- * with the hand-over between every two steps. Every step, every question of a quiz, the settings
- * and the comments open on a page of their own; adding an activity opens a dialog.
+ * with the hand-over between every two steps. Every step, the settings and the comments open on a
+ * page of their own; a question or slide of a quiz opens in a panel over the quiz, and adding an
+ * activity opens a dialog.
  *
  * Every screen has an address, so an experience is somewhere you can go back to:
  *   /experiences/<id>                     the visit
@@ -88,7 +91,9 @@ watch(
   () => route.fullPath,
   async (now, was) => {
     const path = (p: string) => p.split('?')[0]
-    if (!was || path(now) !== path(was)) window.scrollTo(0, 0)
+    // Opening or closing a question's panel keeps the quiz under it where it was.
+    const quiz = (p: string) => path(p).replace(/\/q\/\d+$/, '')
+    if (!was || quiz(now) !== quiz(was)) window.scrollTo(0, 0)
     await focusField()
   },
 )
@@ -191,7 +196,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   <div>
     <Alert v-if="error" variant="error" title="Couldn't load this experience">{{ error }}</Alert>
 
-    <div v-else-if="loading" class="mx-auto max-w-[820px] space-y-6">
+    <div v-else-if="loading" class="space-y-6">
       <div class="space-y-3">
         <Skeleton class="h-4 w-24" />
         <Skeleton class="h-8 w-72" />
@@ -204,8 +209,40 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </div>
     </div>
 
-    <template v-else>
-      <Alert v-if="saveError" variant="error" class="mx-auto mb-6 max-w-[820px]" dismissible @dismiss="saveError = null">{{ saveError }}</Alert>
+    <!--
+      One frame for every page of the experience: the header and the row of steps are drawn here,
+      once, and only the content under them changes. Every one of these addresses renders this same
+      component, so moving between steps patches the content and leaves the frame where it is.
+    -->
+    <div v-else>
+      <div class="mb-6 rounded-lg bg-white px-5 py-5 shadow-xs sm:px-6">
+        <ExperienceHeader
+          :name="title"
+          :base="base"
+          :published="published"
+          :saving="saving"
+          :save-error="!!saveError"
+          :comments="openOf().length"
+          :active="settings ? 'settings' : commentsPage ? 'comments' : publishing ? 'publish' : null"
+          :at-overview="route.name === 'experience' || testing || adding"
+          @comments="router.push(`${base}/comments`)"
+          @settings="router.push(`${base}/settings`)"
+          @test="router.push(`${base}/test`)"
+          @publish="router.push(`${base}/publish`)"
+        />
+        <VisitPath
+          class="-mx-5 -mb-5 mt-5 rounded-b-lg border-t border-border bg-surface-2/60 px-5 py-4 sm:-mx-6 sm:px-6"
+          :a="a"
+          :current="sel"
+          :base="base"
+          :fixes="fixes"
+          :comments="(k) => openOf(k).length"
+          @link="openLink"
+          @add="openAdd"
+        />
+      </div>
+
+      <Alert v-if="saveError && !publishing" variant="error" class="mb-6" dismissible @dismiss="saveError = null">{{ saveError }}</Alert>
 
       <PublishView
         v-if="publishing && project"
@@ -243,27 +280,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :base="base"
       />
 
-      <QuestionPage
-        v-else-if="question"
-        :key="`${question.isl.key}-${question.n}`"
-        :a="a"
-        :cfg="question.isl.cfg"
-        :step-key="question.isl.key"
-        :index="question.n"
-        :name="title"
-        :base="base"
-        :saving="saving"
-        :fixes="fixes"
-        @change="commit"
-      />
-
       <StepFrame
         v-else-if="sel === 'start'"
         :a="a"
         step-key="start"
-        :name="title"
         :base="base"
-        :saving="saving"
         :fixes="fixes"
         :comments="openOf('start')"
         @comments="router.push(`${base}/comments/start`)"
@@ -276,9 +297,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :key="selIsland.isl.key"
         :a="a"
         :step-key="selIsland.isl.key"
-        :name="title"
         :base="base"
-        :saving="saving"
         :fixes="fixes"
         movable
         :comments="openOf(selIsland.isl.key)"
@@ -311,9 +330,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-else-if="sel === 'end'"
         :a="a"
         step-key="end"
-        :name="title"
         :base="base"
-        :saving="saving"
         :fixes="fixes"
         :comments="openOf('end')"
         @comments="router.push(`${base}/comments/end`)"
@@ -324,21 +341,26 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <VisitPage
         v-else
         :a="a"
-        :name="title"
         :published="published"
-        :saving="saving"
-        :save-error="!!saveError"
         :fixes="fixes"
-        :comments="(k) => openOf(k).length"
         @step="openStep"
         @link="openLink"
-        @add="openAdd"
-        @comments="router.push(`${base}/comments`)"
-        @settings="router.push(`${base}/settings`)"
-        @test="router.push(`${base}/test`)"
-        @publish="router.push(`${base}/publish`)"
       />
 
+      <!-- A question or slide opens in a panel over its quiz, so the list stays in view. -->
+      <QuestionPage
+        v-if="question"
+        :key="`${question.isl.key}-${question.n}`"
+        :a="a"
+        :cfg="question.isl.cfg"
+        :step-key="question.isl.key"
+        :index="question.n"
+        :name="title"
+        :base="base"
+        :saving="saving"
+        :fixes="fixes"
+        @change="commit"
+      />
       <TestRun v-if="testing" :a="a" :comments="comments" @close="router.push(base)" />
       <AddActivityDialog
         v-if="adding"
@@ -365,6 +387,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :error="deleteError"
         @confirm="removeExperience"
       />
-    </template>
+    </div>
   </div>
 </template>

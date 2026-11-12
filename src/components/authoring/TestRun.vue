@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { OUTPUTS, colorHex, hasDisplay, mediaName, mediaOf, or, scanName, scanType, type Authoring, type Block } from '@/lib/authoring/engine'
 import { createEmulator, type LogKind } from '@/lib/authoring/emulator'
 import { loadMediaUrl, thumbOf } from '@/lib/authoring/media'
@@ -100,9 +100,23 @@ watch(
   },
 )
 
+// ─── the right column sticks just under the bar, whatever height the bar wraps to
+
+const bar = ref<HTMLElement | null>(null)
+const barH = ref(64)
+let barObs: ResizeObserver | null = null
+onMounted(() => {
+  if (!bar.value) return
+  barH.value = bar.value.offsetHeight
+  if (typeof ResizeObserver === 'undefined') return
+  barObs = new ResizeObserver(() => bar.value && (barH.value = bar.value.offsetHeight))
+  barObs.observe(bar.value)
+})
+
 onUnmounted(() => {
   player.pause()
   if (replyTimer) clearTimeout(replyTimer)
+  barObs?.disconnect()
 })
 // ─── comments: on this screen, or all of them, newest first
 
@@ -130,14 +144,17 @@ const here_step = computed(() => {
 })
 
 const card = 'rounded-lg border border-border bg-white p-5 shadow-xs'
-const pad = 'flex flex-col items-center justify-center gap-1.5 rounded-md border px-3 py-4 text-center text-[13px] font-bold transition-colors'
+/** One input row: icon, label, and what it does — left-aligned, at least 44px tall. */
+const row =
+  'flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-md border bg-white px-3 py-2 text-left text-[13px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep/30'
+const groupHead = 'mb-2 text-[11px] font-extrabold uppercase tracking-overline text-muted-foreground'
 </script>
 
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-50 overflow-y-auto bg-surface-2">
       <!-- The bar: what is being tried, and the way back. -->
-      <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-white px-6 py-3.5">
+      <div ref="bar" class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-white px-6 py-3.5">
         <span class="inline-flex items-center gap-1.5 rounded-pill bg-brand-deep/[.08] px-3 py-1 text-[11px] font-extrabold uppercase tracking-overline text-brand-deep">
           <AIcon name="eye" cls="h-3.5 w-3.5" />Test run
         </span>
@@ -258,7 +275,7 @@ const pad = 'flex flex-col items-center justify-center gap-1.5 rounded-md border
                 <span class="text-[12px] font-bold text-destructive">{{ comments.error.value }}</span>
                 <button type="button" :class="btnDeep" :disabled="!draft.trim()" @click="comment">Comment</button>
               </div>
-              <div class="mt-3 max-h-[46vh] space-y-2.5 overflow-y-auto">
+              <div class="mt-3 space-y-2.5">
                 <template v-if="shown.length">
                   <CommentThread
                     v-for="t in shown"
@@ -274,8 +291,79 @@ const pad = 'flex flex-col items-center justify-center gap-1.5 rounded-md border
             </div>
           </div>
 
-          <!-- The Box, and the scans to place on it. -->
-          <div class="space-y-4 lg:sticky lg:top-20">
+          <!-- What to do next (scans, then video/time triggers), and the Box itself below it. -->
+          <div class="space-y-4 lg:sticky" :style="{ top: barH + 16 + 'px' }">
+            <section :class="card" aria-labelledby="tr-inputs">
+              <h2 id="tr-inputs" class="mb-4 text-[16px] font-extrabold">Try an input</h2>
+
+              <h3 :class="groupHead">Place a scan</h3>
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                <button
+                  v-for="[id, what] in ch.objects"
+                  :key="id"
+                  type="button"
+                  :title="`${scanType(a, id).name} — ${what}`"
+                  :class="[row, 'border-brand-deep/60 bg-brand-deep/[.04] text-foreground hover:border-brand-deep hover:bg-brand-deep/[.08]']"
+                  @click="scan(id)"
+                >
+                  <span class="shrink-0 text-brand-deep"><AIcon name="scan" cls="h-5 w-5" /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate">{{ scanType(a, id).name }}</span>
+                    <span class="block truncate text-[11.5px] font-semibold text-muted-foreground">{{ what }}</span>
+                  </span>
+                </button>
+                <button
+                  v-for="id in others"
+                  :key="id"
+                  type="button"
+                  :title="scanType(a, id).name"
+                  :class="[row, 'border-border text-secondary-foreground hover:border-brand-deep/50 hover:text-brand-deep']"
+                  @click="scan(id)"
+                >
+                  <span class="shrink-0 text-muted-foreground"><AIcon name="scan" cls="h-5 w-5" /></span>
+                  <span class="min-w-0 flex-1 truncate">{{ scanType(a, id).name }}</span>
+                </button>
+              </div>
+              <p class="mt-2 text-[12px] text-muted-foreground">{{ ch.other ? 'Anything else: ' + ch.other : 'Anything else does nothing here.' }}</p>
+
+              <div v-if="ch.video.length || ch.timed.length" class="mt-4 border-t border-border pt-4">
+                <h3 :class="groupHead">Or make something happen</h3>
+                <div class="space-y-2">
+                  <button
+                    v-for="v in ch.video"
+                    :key="v.key"
+                    type="button"
+                    :title="`The video ends — ${v.what}`"
+                    :class="[row, 'border-border hover:border-brand-deep']"
+                    @click="fireKey(v.key, 'The video ends')"
+                  >
+                    <span class="shrink-0 text-brand-deep"><AIcon name="film" cls="h-5 w-5" /></span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate">The video ends</span>
+                      <span class="block truncate text-[11.5px] font-semibold text-muted-foreground">{{ v.what }}</span>
+                    </span>
+                  </button>
+                  <button
+                    v-for="t in ch.timed"
+                    :key="t.key"
+                    type="button"
+                    :title="`${t.seconds} seconds pass — ${t.what}`"
+                    :class="[row, 'border-border hover:border-brand-deep']"
+                    @click="fireKey(t.key, `${t.seconds} seconds pass`)"
+                  >
+                    <span class="shrink-0 text-brand-deep"><AIcon name="timer" cls="h-5 w-5" /></span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate">{{ t.seconds }} seconds pass</span>
+                      <span class="block truncate text-[11.5px] font-semibold text-muted-foreground">{{ t.what }}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <p v-if="!ch.objects.size && !ch.video.length && !ch.timed.length && !ch.other" class="mt-3 text-[12.5px] font-bold text-warning">
+                Nothing moves the visitor on from here. Check its rules.
+              </p>
+            </section>
+
             <div>
               <h2 class="mb-2 text-[16px] font-extrabold">The Box</h2>
               <div class="rounded-[1.75rem] bg-[#1f2330] p-4 shadow-md">
@@ -314,52 +402,6 @@ const pad = 'flex flex-col items-center justify-center gap-1.5 rounded-md border
               </div>
             </div>
 
-            <div :class="card">
-              <h2 class="mb-3 text-[16px] font-extrabold">Place a scan on the Box</h2>
-              <div class="grid grid-cols-2 gap-2.5">
-                <button
-                  v-for="[id, what] in ch.objects"
-                  :key="id"
-                  type="button"
-                  :class="[pad, 'border-border bg-white hover:border-brand-deep']"
-                  @click="scan(id)"
-                >
-                  <span class="text-brand-deep"><AIcon name="scan" cls="h-6 w-6" /></span>
-                  {{ scanType(a, id).name }}
-                  <span class="text-[11.5px] font-semibold text-muted-foreground">{{ what }}</span>
-                </button>
-                <button v-for="id in others" :key="id" type="button" :class="[pad, 'border-border bg-white text-muted-foreground/70 hover:border-brand-deep/50']" @click="scan(id)">
-                  <span class="opacity-50"><AIcon name="scan" cls="h-6 w-6" /></span>
-                  {{ scanType(a, id).name }}
-                </button>
-              </div>
-              <p class="mt-3 text-[12px] text-muted-foreground">{{ ch.other ? 'Anything else: ' + ch.other : 'Anything else does nothing here.' }}</p>
-              <div v-if="ch.video.length || ch.timed.length" class="mt-4 space-y-2 border-t border-border pt-4">
-                <button
-                  v-for="v in ch.video"
-                  :key="v.key"
-                  type="button"
-                  class="flex w-full items-center gap-2.5 rounded-md border border-border px-3 py-2.5 text-left text-[13px] font-bold hover:border-brand-deep"
-                  @click="fireKey(v.key, 'The video ends')"
-                >
-                  <span class="text-brand-deep"><AIcon name="film" /></span>
-                  <span>The video ends<span class="block text-[11.5px] font-semibold text-muted-foreground">{{ v.what }}</span></span>
-                </button>
-                <button
-                  v-for="t in ch.timed"
-                  :key="t.key"
-                  type="button"
-                  class="flex w-full items-center gap-2.5 rounded-md border border-border px-3 py-2.5 text-left text-[13px] font-bold hover:border-brand-deep"
-                  @click="fireKey(t.key, `${t.seconds} seconds pass`)"
-                >
-                  <span class="text-brand-deep"><AIcon name="timer" /></span>
-                  <span>{{ t.seconds }} seconds pass<span class="block text-[11.5px] font-semibold text-muted-foreground">{{ t.what }}</span></span>
-                </button>
-              </div>
-              <p v-if="!ch.objects.size && !ch.video.length && !ch.timed.length && !ch.other" class="mt-3 text-[12.5px] font-bold text-warning">
-                Nothing moves the visitor on from here. Check its rules.
-              </p>
-            </div>
           </div>
         </div>
       </div>

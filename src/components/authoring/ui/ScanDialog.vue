@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { ScanType } from '@/lib/authoring/engine'
 import AIcon from '../AIcon.vue'
-import { bigInput, btnDeep, btnOutline, overlay } from './styles'
+import { bigInput, btnDeep, btnOutline, dialogBody, dialogBox, dialogClose, dialogHead, dialogTitle, overlay } from './styles'
 
 /**
  * Every scan the museum has, as tiles, and at the end a way to name one of your own — an experience
@@ -41,14 +41,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 <template>
   <Teleport to="body">
     <div :class="overlay" @click.self="emit('close')">
-      <div role="dialog" aria-modal="true" aria-label="Choose a scan" class="dialog-in w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div class="flex items-center gap-3 border-b border-border px-7 py-5">
-          <h2 class="flex-1 text-[16px] font-extrabold">Choose a scan</h2>
-          <button type="button" aria-label="Close" class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2" @click="emit('close')">
+      <div role="dialog" aria-modal="true" aria-label="Choose a scan object" :class="[dialogBox, 'max-w-2xl']">
+        <div :class="[dialogHead, 'items-center']">
+          <h2 :class="[dialogTitle, 'min-w-0 flex-1']">Choose a scan object</h2>
+          <button type="button" title="Close" aria-label="Close" :class="dialogClose" @click="emit('close')">
             <AIcon name="x" cls="h-5 w-5" />
           </button>
         </div>
-        <div class="grid max-h-[70vh] gap-2.5 overflow-y-auto p-7 sm:grid-cols-2">
+        <div :class="[dialogBody, 'grid content-start gap-2.5 sm:grid-cols-2']">
           <button
             v-for="t in types"
             :key="t.id"
@@ -69,7 +69,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
           >
             <span class="flex h-7 w-7 shrink-0 items-center justify-center"><AIcon name="scan" cls="h-6 w-6" /></span>
             <span class="min-w-0 flex-1 truncate">{{ own }}</span>
-            <span class="shrink-0 rounded-pill bg-amber-100 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not registered yet</span>
+            <span class="shrink-0 rounded-pill bg-warning/10 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not registered yet</span>
             <AIcon name="check" cls="h-5 w-5" />
           </button>
           <div v-if="adding" class="rounded-md border border-brand-deep bg-brand-deep/[.03] p-4 sm:col-span-2">

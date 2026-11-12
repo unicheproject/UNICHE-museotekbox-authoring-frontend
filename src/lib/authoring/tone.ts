@@ -24,7 +24,14 @@ const templateOf = (a: Authoring, key: string) => a.islands.find((x) => x.key ==
 export const stepTone = (a: Authoring, key: string) => toneOf(key === 'start' || key === 'end' ? key : templateOf(a, key))
 export const stepGlyph = (a: Authoring, key: string) =>
   key === 'start' ? 'bolt' : key === 'end' ? 'flag' : template(templateOf(a, key)).icon
-export const stepTitle = (a: Authoring, key: string) =>
-  key === 'start' ? 'Start' : key === 'end' ? 'End' : template(templateOf(a, key)).name
+/** Its name; when several activities are of one kind they are numbered in visit order ("Quiz 2"). */
+export function stepTitle(a: Authoring, key: string) {
+  if (key === 'start') return 'Start'
+  if (key === 'end') return 'End'
+  const kind = templateOf(a, key)
+  const name = template(kind).name
+  const same = a.islands.filter((x) => x.templateId === kind)
+  return same.length > 1 ? `${name} ${same.findIndex((x) => x.key === key) + 1}` : name
+}
 /** Every step of the visit, in order. */
 export const stepKeys = (a: Authoring) => ['start', ...a.islands.map((x) => x.key), 'end']

@@ -15,7 +15,6 @@ import { fetchQuery } from '@/lib/useQuery'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import AIcon from './AIcon.vue'
-import Crumbs from './ui/Crumbs.vue'
 import QCard from './ui/QCard.vue'
 import { btnGrad, btnOutline } from './ui/styles'
 
@@ -63,11 +62,19 @@ const ready = computed(
   () => changed.value && !publishing.value && !props.pending && !props.saveError && (!blocked.value || chosen.size === 0),
 )
 /** What to finish first: each missing thing with its way there, else the checks that failed. */
-const todo = computed(() =>
-  props.fixes.length
-    ? props.fixes.map((r) => ({ text: `${r.where}: ${r.gap.charAt(0).toLowerCase()}${r.gap.slice(1)}`, row: r as FixRow | null }))
-    : checks.value.filter((c) => !c.ok).map((c) => ({ text: c.text, row: null as FixRow | null })),
-)
+// The same gap on several items (six slides with nothing to show) is one line with a count.
+const todo = computed(() => {
+  if (!props.fixes.length) return checks.value.filter((c) => !c.ok).map((c) => ({ text: c.text, row: null as FixRow | null, times: 1 }))
+  const out: { text: string; row: FixRow | null; times: number }[] = []
+  for (const r of props.fixes) {
+    const text = `${r.where}: ${r.gap.charAt(0).toLowerCase()}${r.gap.slice(1)}`
+    const same = out.find((x) => x.text === text)
+    if (same) same.times++
+    else out.push({ text, row: r, times: 1 })
+  }
+  return out
+})
+const todoCount = computed(() => todo.value.reduce((n, x) => n + x.times, 0))
 
 onMounted(async () => {
   try {
@@ -131,7 +138,7 @@ async function publish() {
       <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-pill bg-success/10 text-success">
         <AIcon name="check" cls="h-7 w-7" />
       </span>
-      <h1 class="mt-4 text-2xl font-extrabold tracking-tight">{{ done.length ? 'It is out' : 'Taken off every box' }}</h1>
+      <h1 class="mt-4 text-2xl font-extrabold tracking-tight">{{ done.length ? 'Published' : 'Taken off every Box' }}</h1>
       <p class="mt-2 text-[13.5px] text-muted-foreground">
         {{ a.details.name }} · {{ done.length }} box{{ done.length === 1 ? '' : 'es' }}
       </p>
@@ -151,9 +158,8 @@ async function publish() {
     </div>
   </div>
 
-  <div v-else class="mx-auto max-w-[760px] min-[1700px]:max-w-[1100px]">
-    <Crumbs :parts="[{ text: 'Experiences', to: '/experiences' }, { text: a.details.name || 'Untitled experience', to: base }, { text: 'Publish' }]" />
-    <h1 class="mb-5 text-2xl font-extrabold tracking-tight">Publish</h1>
+  <div v-else>
+    <h2 class="mb-5 text-xl font-extrabold tracking-tight">Publish</h2>
 
     <Alert v-if="error" variant="error" class="mb-4">{{ error }}</Alert>
     <Alert v-if="saveError" variant="error" class="mb-4" title="The last change was not saved">{{ saveError }}</Alert>
@@ -165,12 +171,12 @@ async function publish() {
             <component
               :is="x.row ? 'button' : 'div'"
               type="button"
-              class="flex w-full items-center gap-3 rounded-md border border-amber-200 bg-amber-50/60 px-4 py-3.5 text-left"
+              class="flex w-full items-center gap-3 rounded-md border border-warning/20 bg-warning/[.04] px-4 py-3.5 text-left"
               :class="x.row ? 'hover:border-warning' : ''"
               @click="x.row && emit('fix', x.row)"
             >
               <span class="text-warning"><AIcon name="alert" cls="h-5 w-5" /></span>
-              <span class="flex-1 text-[14px] font-semibold">{{ x.text }}</span>
+              <span class="flex-1 text-[14px] font-semibold">{{ x.text }}<span v-if="x.times > 1" class="font-normal text-secondary-foreground"> ({{ x.times }} times)</span></span>
               <span v-if="x.row" class="text-[13.5px] font-bold text-brand-deep">Fix it</span>
             </component>
           </li>
@@ -216,10 +222,11 @@ async function publish() {
 
     <div class="mt-8 flex flex-wrap items-center justify-end gap-4 border-t border-border pb-12 pt-6">
       <span v-if="!ready" class="text-[13.5px] font-semibold text-muted-foreground">
-        <template v-if="pending">Saving…</template>
-        <template v-else-if="blocked && chosen.size">{{ todo.length }} thing{{ todo.length === 1 ? '' : 's' }} left</template>
-        <template v-else-if="!chosen.size && !rows.some((r) => r.has)">Choose a Box</template>
-        <template v-else-if="!changed">Nothing has changed</template>
+        <template v-if="pending">Saving your last change…</template>
+        <template v-else-if="saveError">Your last change was not saved</template>
+        <template v-else-if="blocked">Finish the {{ todoCount }} thing{{ todoCount === 1 ? '' : 's' }} above first</template>
+        <template v-else-if="!chosen.size && !rows.some((r) => r.has)">Tick at least one Box</template>
+        <template v-else-if="!changed">It is already on exactly these Boxes</template>
       </span>
       <button
         type="button"
