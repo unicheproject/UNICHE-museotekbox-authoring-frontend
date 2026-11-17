@@ -6,12 +6,15 @@ import { Briefcase, Plus, Trash2 } from 'lucide-vue-next'
 import { useAuthzStore } from '@/stores/authz'
 import ExperienceCard from '@/components/experience/ExperienceCard.vue'
 import { useExperienceList } from '@/lib/useExperienceList'
+import { canCreateExperience } from '@/lib/experiences'
 import { useOrgNames } from '@/lib/useOrgNames'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import CreateExperienceDialog from '@/components/experience/CreateExperienceDialog.vue'
+import { cardGrid as grid, headBtnGrad as btnGrad, headBtnOutline as btnOutline } from '@/components/experience/styles'
+import ListHeader from '@/components/inventory/ListHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,9 +31,7 @@ const orgIds = computed(() => {
   )
 })
 
-const canCreate = computed(
-  () => context.value?.platformAdmin || (context.value?.managedOrganisations.length ?? 0) > 0,
-)
+const canCreate = computed(() => canCreateExperience(context.value))
 /** The New experience dialog has its own address, so it opens over the list from a link too. */
 const createOpen = computed(() => route.name === 'experience-new' && canCreate.value)
 /** The experience is created in the organisation the author manages; they are not asked which. */
@@ -42,18 +43,11 @@ const canSeeDeleted = computed(
 
 // Everything the list shows, with a few calls per organisation however many experiences there
 // are; each card then reads only its own experience, once it is on screen.
-const { experiences, pending, error, factsOf } = useExperienceList(orgIds)
+const { experiences, pending, error, refresh, factsOf } = useExperienceList(orgIds)
 
 onMounted(() => authzStore.load())
 watch(orgIds, (ids) => ids.length && resolveOrgNames(ids), { immediate: true })
 
-// Past laptop size the page is not capped (route meta `wide`), so the grid adds columns.
-const grid = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4 min-[2300px]:grid-cols-5'
-// The buttons of the authoring screens: squared-off, uppercase.
-const btnOutline =
-  'inline-flex items-center justify-center gap-2 rounded-md border border-input bg-white px-3.5 py-2 text-[11.5px] font-extrabold uppercase tracking-button text-secondary-foreground hover:border-brand-deep hover:text-brand-deep'
-const btnGrad =
-  'inline-flex items-center justify-center gap-2 rounded-md bg-grad-brand px-3.5 py-2 text-[11.5px] font-extrabold uppercase tracking-button text-white shadow-md transition-transform hover:-translate-y-0.5'
 
 /** "Acropolis Museum · 3 experiences", as shown under the title. */
 const subtitle = computed(() => {
@@ -65,32 +59,23 @@ const subtitle = computed(() => {
 
 <template>
   <div>
-    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-extrabold tracking-tight">Experiences</h1>
-        <p class="mt-0.5 text-[13px] text-muted-foreground">{{ subtitle }}</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <RouterLink
-          v-if="canSeeDeleted"
-          to="/experiences/deleted"
-          :class="btnOutline"
-        >
+    <ListHeader title="Experiences" :subtitle="subtitle">
+      <template #actions>
+        <RouterLink v-if="canSeeDeleted" to="/experiences/deleted" :class="btnOutline">
           <Trash2 class="h-3.5 w-3.5" />
           Deleted
         </RouterLink>
-        <RouterLink
-          v-if="canCreate"
-          to="/experiences/new"
-          :class="btnGrad"
-        >
+        <RouterLink v-if="canCreate" to="/experiences/new" :class="btnGrad">
           <Plus class="h-4 w-4" />
           New experience
         </RouterLink>
-      </div>
-    </div>
+      </template>
+    </ListHeader>
 
-    <Alert v-if="error" variant="error" title="Couldn't load your experiences">{{ error }}</Alert>
+    <Alert v-if="error" variant="error" title="Couldn't load your experiences">
+      {{ error }}
+      <button type="button" :class="[btnOutline, 'mt-3']" @click="refresh()">Try again</button>
+    </Alert>
 
     <div v-else-if="pending" :class="grid">
       <div v-for="n in 8" :key="n" class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
@@ -102,8 +87,22 @@ const subtitle = computed(() => {
       </div>
     </div>
 
+    <!-- Nothing yet: what an experience is, and the first step for whoever can take it. -->
     <Card v-else-if="!experiences.length">
-      <EmptyState title="No experiences" :icon="Briefcase" />
+      <EmptyState
+        title="No experiences yet"
+        :description="
+          canCreate
+            ? 'An experience is a visit you create: what visitors see and hear at a Box. Create your first one to guide visitors through your collection.'
+            : 'Experiences you are invited to appear here. Ask your organisation manager to invite you.'
+        "
+        :icon="Briefcase"
+        tone="brand"
+      >
+        <template v-if="canCreate" #action>
+          <RouterLink to="/experiences/new" :class="btnGrad"><Plus class="h-4 w-4" />New experience</RouterLink>
+        </template>
+      </EmptyState>
     </Card>
 
     <!-- The experience card: its picture with its activities, what it is, and what is left to do. -->
