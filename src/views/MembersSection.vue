@@ -1,121 +1,117 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { CalendarDays, Users } from 'lucide-vue-next'
+import { computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { Users } from 'lucide-vue-next'
 import { listMembers, type MemberDto } from '@/api/museotekBox'
 import { useQuery } from '@/lib/useQuery'
 import { useOrgScope } from '@/lib/useOrgScope'
-import { Badge } from '@/components/ui/badge'
+import { useOrgNames } from '@/lib/useOrgNames'
+import { isSelfMember, memberName, memberRole, memberSince, memberSubline } from '@/lib/members'
+import { canManageOrg } from '@/platform/authz'
+import { useAuthStore } from '@/stores/auth'
 import { Select } from '@/components/ui/select'
 import { Avatar } from '@/components/ui/avatar'
+import { Alert } from '@/components/ui/alert'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
-import { PageHeader } from '@/components/ui/page-header'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cardGrid, headBtnOutline, pill, pillTone } from '@/components/experience/styles'
+import ListHeader from '@/components/inventory/ListHeader.vue'
 
 const { orgId, orgOptions, showPicker, context } = useOrgScope()
+const { profile } = storeToRefs(useAuthStore())
+const { names: orgNames, resolve: resolveOrgNames } = useOrgNames()
+watch(orgId, (id) => id && resolveOrgNames([id]), { immediate: true })
 
-const { data, pending, error } = useQuery(
-  () => (orgId.value ? ['members', orgId.value] : null),
+/**
+ * Only a manager of the organisation (or a platform admin) can read its members; anyone else would
+ * get a 403, so for them nothing is asked and the page says why.
+ */
+const allowed = computed(() => canManageOrg(context.value, orgId.value))
+
+const { data, pending, error, refresh } = useQuery(
+  () => (orgId.value && allowed.value ? ['members', orgId.value] : null),
   () => listMembers(orgId.value),
 )
 
 const members = computed<MemberDto[]>(() => data.value ?? [])
 
-/**
- * `userId` is null for someone with no IdP account yet, so identity falls back to the email: it is
- * what the backend keys those rows on, and it is stable enough for :key and for the avatar colour.
- */
-function identity(member: MemberDto) {
-  return member.userId ?? member.email ?? ''
-}
+const subtitle = computed(() => {
+  const org = orgNames.value[orgId.value] ?? ''
+  if (!allowed.value || !data.value) return org || undefined
+  const n = members.value.length
+  return `${org ? `${org} · ` : ''}${n} member${n === 1 ? '' : 's'}`
+})
 
-/** The signed-in user is marked in the list rather than pulled out of it. */
-function isSelf(member: MemberDto) {
-  return member.userId !== null && member.userId === context.value?.subject
-}
-
-function displayName(member: MemberDto) {
-  return member.displayName || member.email || identity(member) || 'Unknown'
-}
-
-function initial(member: MemberDto) {
-  return displayName(member).trim().charAt(0).toUpperCase() || '—'
-}
-
-/** `since` is an ISO instant; only the day matters here. */
-function joinedOn(since: string | null) {
-  if (!since) return null
-  const date = new Date(since)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-/** Roles arrive as backend constants (e.g. ORG_MANAGER); shown in title case. */
-function roleLabel(role: string | null) {
-  if (!role) return null
-  return role
-    .toLowerCase()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
-
-function roleVariant(role: string | null) {
-  const value = role?.toUpperCase() ?? ''
-  if (value.includes('MANAGER') || value.includes('ADMIN')) return 'purple' as const
-  return 'neutral' as const
-}
+/** Rows have no stable id of their own: the email is what the backend keys them on. */
+const key = (m: MemberDto) => m.email || m.userId || memberName(m)
+const isSelf = (m: MemberDto) => isSelfMember(m, profile.value?.email)
+const initial = (m: MemberDto) => memberName(m).trim().charAt(0).toUpperCase() || '—'
 </script>
 
 <template>
   <div>
-    <PageHeader title="Members">
+    <ListHeader title="Members" :subtitle="subtitle">
       <template #actions>
-        <Select
-          v-if="showPicker"
-          v-model="orgId"
-          :options="orgOptions"
-          class="w-56"
-          aria-label="Organisation"
-        />
+        <Select v-if="showPicker" v-model="orgId" :options="orgOptions" class="w-56" aria-label="Organisation" />
       </template>
-    </PageHeader>
+    </ListHeader>
 
-    <p v-if="pending" class="text-sm text-muted-foreground">Loading…</p>
-    <p v-else-if="error" class="text-sm text-destructive">{{ error }}</p>
+    <Card v-if="context && orgId && !allowed">
+      <EmptyState
+        title="Only organisation managers can see the member list"
+        description="Ask your organisation manager if you need to know who is in the team."
+        :icon="Users"
+      />
+    </Card>
+
+    <Alert v-else-if="error" variant="error" title="Couldn't load the members">
+      {{ error }}
+      <button type="button" :class="[headBtnOutline, 'mt-3']" @click="refresh()">Try again</button>
+    </Alert>
+
+    <div v-else-if="pending" :class="cardGrid">
+      <div v-for="n in 3" :key="n" class="rounded-lg border border-border bg-white p-5 shadow-xs">
+        <div class="flex items-center gap-3">
+          <Skeleton class="h-10 w-10 rounded-full" />
+          <div class="space-y-2">
+            <Skeleton class="h-4 w-32" />
+            <Skeleton class="h-3 w-40" />
+          </div>
+        </div>
+        <Skeleton class="mt-5 h-4 w-28" />
+      </div>
+    </div>
 
     <Card v-else-if="!members.length">
       <EmptyState title="No members" :icon="Users" />
     </Card>
 
-    <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <div
-        v-for="member in members"
-        :key="identity(member)"
-        class="rounded-lg border border-border bg-card p-5 shadow-xs transition-shadow hover:shadow-sm"
-      >
-        <div class="flex items-start gap-3">
-          <!-- The signed-in user is the one avatar in the accent violet, so they can find
-               themselves in the grid without reading every name. -->
-          <Avatar :initials="initial(member)" :variant="isSelf(member) ? 'purple' : 'deep'" />
-          <div class="min-w-0">
-            <p class="truncate text-sm font-bold text-foreground">
-              {{ displayName(member) }}
-              <span v-if="isSelf(member)" class="text-xs font-medium text-muted-foreground">(you)</span>
-            </p>
-            <p v-if="member.email" class="truncate text-xs text-muted-foreground">{{ member.email }}</p>
+    <!-- The same white box as the cards of the other lists: who, then a footer with the role and its date. -->
+    <template v-else>
+      <div :class="cardGrid">
+        <div v-for="m in members" :key="key(m)" class="flex flex-col rounded-lg border border-border bg-white shadow-xs">
+          <div class="flex items-center gap-3 px-4 pb-4 pt-4">
+            <!-- The signed-in user is the one avatar in the accent violet, so they can find themselves. -->
+            <Avatar :initials="initial(m)" :variant="isSelf(m) ? 'purple' : 'deep'" />
+            <div class="min-w-0">
+              <p class="truncate text-[15px] font-extrabold">
+                {{ memberName(m) }}
+                <span v-if="isSelf(m)" class="text-[12.5px] font-semibold text-muted-foreground">(you)</span>
+              </p>
+              <p v-if="memberSubline(m)" class="truncate text-[13px] text-muted-foreground">{{ memberSubline(m) }}</p>
+            </div>
+          </div>
+          <div class="mx-4 mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border py-3">
+            <span v-if="memberRole(m.role)" :class="[pill, m.role === 'MANAGER' ? pillTone.brand : pillTone.neutral]">{{ memberRole(m.role) }}</span>
+            <span v-if="memberSince(m)" class="text-[12.5px] text-muted-foreground">{{ memberSince(m) }}</span>
           </div>
         </div>
-
-        <p v-if="joinedOn(member.since)" class="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <CalendarDays class="h-3.5 w-3.5" />
-          Member since {{ joinedOn(member.since) }}
-        </p>
-
-        <Badge v-if="roleLabel(member.role)" :variant="roleVariant(member.role)" class="mt-3">
-          {{ roleLabel(member.role) }}
-        </Badge>
       </div>
-    </div>
+      <!-- Alone in the organisation: say how others arrive (invitations are made outside this tool). -->
+      <p v-if="members.length === 1 && isSelf(members[0])" class="mt-4 text-[13px] text-muted-foreground">
+        Only you so far. Curators appear here when they accept an invitation to an experience.
+      </p>
+    </template>
   </div>
 </template>
