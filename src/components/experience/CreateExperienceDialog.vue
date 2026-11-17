@@ -25,7 +25,11 @@ import {
  * it plays — plus, if the author already knows it, the first activity. How it starts is set on the
  * experience itself.
  */
-const props = defineProps<{ orgId: string }>()
+const props = defineProps<{
+  orgId: string
+  /** Opened from the Dashboard's guide: the editor it leads to shows the guide's bar (step 2). */
+  guide?: boolean
+}>()
 const emit = defineEmits<{ close: [] }>()
 
 const router = useRouter()
@@ -74,7 +78,10 @@ async function create() {
     const { project, firstKey } = await createExperience(props.orgId, { name: name.value, output: output.value, first: first.value || null })
     invalidateQueries('projects')
     // With a first activity it opens on that activity, ready to fill in; without, on the visit.
-    await router.push(firstKey ? `/experiences/${project.id}/step/${firstKey}` : `/experiences/${project.id}`)
+    await router.push({
+      path: firstKey ? `/experiences/${project.id}/step/${firstKey}` : `/experiences/${project.id}`,
+      query: props.guide ? { guide: '2' } : {},
+    })
   } catch (e) {
     error.value = describeError(e)
   } finally {
