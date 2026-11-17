@@ -1,0 +1,159 @@
+/*
+ * The Box's display: a TV read from three to five metres. Sizes are in vw so the page reads the
+ * same on any screen (1vw = 19.2px at 1920). Dark ground as in the editor's screen preview.
+ */
+.dsp {
+  --dsp-ground: #0b1020;
+  --dsp-muted: rgba(255, 255, 255, 0.62);
+  --dsp-faint: rgba(255, 255, 255, 0.4);
+  --dsp-tile: rgba(255, 255, 255, 0.05);
+  --dsp-line: rgba(255, 255, 255, 0.09);
+  --dsp-grad: linear-gradient(135deg, #f832a4 0%, #b05fd6 50%, #29f8fd 100%);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--dsp-ground);
+  color: #fff;
+  font-family: Montserrat, system-ui, sans-serif;
+  cursor: none;
+  user-select: none;
+}
+/* The pointer shows while the mouse moves (DisplayScreen hides it again after 3s still), and
+   always on the one screen with a control (sign in again). */
+.dsp.dsp-pointer { cursor: default; }
+.dsp.dsp-interactive { cursor: default; user-select: auto; }
+/* A faint brand glow, so the ground is not flat black from across the room. */
+.dsp::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60vw 40vw at 12% -10%, rgba(176, 95, 214, 0.22), transparent 70%),
+    radial-gradient(50vw 35vw at 95% 110%, rgba(41, 248, 253, 0.1), transparent 70%);
+  pointer-events: none;
+}
+
+/* Anti burn-in: the whole layout wanders a few pixels over 20 minutes. */
+.dsp-stage {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 4.2vw 5vw 3.4vw;
+  animation: dsp-drift 1200s linear infinite;
+}
+@keyframes dsp-drift {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(6px, -4px); }
+  50% { transform: translate(-5px, 5px); }
+  75% { transform: translate(4px, 6px); }
+}
+
+/* The header is centred, over centred tiles, messages and call to action: one axis down the screen. */
+.dsp-head { text-align: center; }
+.dsp-org { font-size: 1.35vw; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dsp-muted); }
+.dsp-box { margin-top: 0.6vw; font-size: 3.4vw; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; overflow-wrap: anywhere; }
+.dsp-bar { margin: 1.4vw auto 0; width: 6vw; height: 0.32vw; border-radius: 1vw; background: var(--dsp-grad); }
+
+.dsp-main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 2.6vw 0; }
+
+/* ── Tiles: the layout follows how many share a page ── */
+.dsp-grid { display: grid; gap: 2vw; width: 100%; height: 100%; }
+.dsp-grid.n1 { grid-template-columns: minmax(0, 62vw); justify-content: center; align-content: center; height: auto; }
+.dsp-grid.n2 { grid-template-columns: 1fr 1fr; align-content: center; height: 72%; }
+.dsp-grid.n3 { grid-template-columns: repeat(3, 1fr); align-content: center; height: 78%; }
+.dsp-grid.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+.dsp-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2vw;
+  min-width: 0;
+  min-height: 0;
+  padding: 2.4vw 2.6vw;
+  border-radius: 1.6vw;
+  background: var(--dsp-tile);
+  border: 1px solid var(--dsp-line);
+  overflow: hidden;
+}
+.dsp-tile::before { content: ''; position: absolute; left: 0; top: 0; right: 0; height: 0.3vw; background: var(--dsp-grad); opacity: 0.85; }
+/* Names can be 255 characters, Greek or English: wrap, then cut. */
+.dsp-name {
+  flex-shrink: 0;
+  font-size: 2.6vw;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dsp-start { display: flex; flex-direction: column; align-items: flex-start; gap: 0.7vw; }
+.dsp-label { font-size: 1.05vw; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-faint); }
+.dsp-chip { display: inline-flex; align-items: center; gap: 1vw; max-width: 100%; padding: 0.7vw 1.6vw 0.7vw 0.8vw; border-radius: 99vw; background: rgba(255, 255, 255, 0.08); }
+.dsp-card { min-width: 0; font-size: 1.6vw; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dsp-dot { flex-shrink: 0; width: 2.4vw; height: 2.4vw; border-radius: 50%; box-shadow: inset 0 0 0 0.18vw rgba(255, 255, 255, 0.25); }
+/* White sits on a near-white chip otherwise: a dark gap and a bright ring keep its edge clear. */
+.dsp-dot.white { box-shadow: 0 0 0 0.2vw var(--dsp-ground), 0 0 0 0.38vw rgba(255, 255, 255, 0.85); }
+.dsp-dot.object { display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+.dsp-dot.object svg { width: 1.4vw; height: 1.4vw; }
+
+.dsp-grid.n1 .dsp-tile { padding: 3.6vw 4vw; gap: 3vw; }
+.dsp-grid.n1 .dsp-name { font-size: 4.2vw; }
+.dsp-grid.n1 .dsp-card { font-size: 2vw; }
+.dsp-grid.n1 .dsp-dot { width: 3vw; height: 3vw; }
+.dsp-grid.n2 .dsp-name { font-size: 3.2vw; }
+.dsp-grid.n4 .dsp-tile { padding: 1.7vw 2.2vw; gap: 1vw; }
+.dsp-grid.n4 .dsp-name { font-size: 2.1vw; -webkit-line-clamp: 2; }
+.dsp-grid.n4 .dsp-start { flex-direction: row; align-items: center; gap: 1.2vw; }
+.dsp-grid.n4 .dsp-chip { padding: 0.5vw 1.3vw 0.5vw 0.6vw; }
+.dsp-grid.n4 .dsp-dot { width: 2vw; height: 2vw; }
+.dsp-grid.n4 .dsp-card { font-size: 1.4vw; }
+
+/* ── Footer: the call to action and, with pages, where we are ── */
+.dsp-foot { position: relative; display: flex; align-items: center; justify-content: center; min-height: 4vw; }
+.dsp-cta { display: flex; align-items: center; gap: 1.2vw; font-size: 2.2vw; font-weight: 700; animation: dsp-breathe 5s ease-in-out infinite; }
+.dsp-cta svg { width: 2.6vw; height: 2.6vw; }
+@keyframes dsp-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.dsp-pages { position: absolute; right: 0; display: flex; align-items: center; gap: 0.8vw; font-size: 1.1vw; font-weight: 600; color: var(--dsp-faint); }
+.dsp-pages i { display: block; width: 0.75vw; height: 0.75vw; border-radius: 50%; background: rgba(255, 255, 255, 0.22); transition: width 0.6s ease; }
+.dsp-pages i.on { width: 2.2vw; border-radius: 1vw; background: #fff; }
+
+/* Pages cross-fade. */
+.dsp-fade-enter-active, .dsp-fade-leave-active { transition: opacity 0.9s ease; }
+.dsp-fade-enter-from, .dsp-fade-leave-to { opacity: 0; }
+
+/* ── Full-screen messages: empty, error, disconnected ── */
+.dsp-message { text-align: center; max-width: 62vw; }
+.dsp-message-icon { width: 6vw; height: 6vw; margin: 0 auto 2.4vw; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.07); }
+.dsp-message-icon svg { width: 3vw; height: 3vw; color: var(--dsp-muted); }
+.dsp-message h1 { font-size: 3.4vw; font-weight: 800; line-height: 1.15; }
+.dsp-message p { margin-top: 1.4vw; font-size: 1.7vw; font-weight: 500; line-height: 1.45; color: var(--dsp-muted); }
+.dsp-btn {
+  display: inline-block;
+  margin-top: 3vw;
+  padding: 1.1vw 2.6vw;
+  border: 0;
+  border-radius: 0.6vw;
+  background: var(--dsp-grad);
+  color: #fff;
+  font: 700 1.4vw Montserrat, system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dsp-btn:focus-visible { outline: 0.25vw solid #fff; outline-offset: 0.3vw; }
+
+/* Small corner notes: data could not be refreshed, or how to go full screen. */
+.dsp-note { position: absolute; left: 5vw; bottom: 1.2vw; display: flex; align-items: center; gap: 0.6vw; font-size: 0.95vw; font-weight: 600; color: var(--dsp-faint); }
+.dsp-note svg { width: 1.1vw; height: 1.1vw; }
+.dsp-hint { position: absolute; top: 1.4vw; right: 1.6vw; padding: 0.6vw 1.1vw; border-radius: 0.5vw; background: rgba(255, 255, 255, 0.08); font-size: 1vw; font-weight: 600; color: var(--dsp-muted); transition: opacity 1s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dsp-stage, .dsp-cta { animation: none; }
+  .dsp-fade-enter-active, .dsp-fade-leave-active, .dsp-pages i, .dsp-hint { transition: none; }
+}
