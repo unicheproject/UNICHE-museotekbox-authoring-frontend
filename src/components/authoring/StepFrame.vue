@@ -3,25 +3,21 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { CommentThreadDto } from '@/api/museotekBox'
 import type { Authoring, FixRow } from '@/lib/authoring/engine'
-import { stepGlyph, stepKeys, stepTitle, stepTone } from '@/lib/authoring/tone'
+import { stepKeys, stepTitle } from '@/lib/authoring/tone'
 import AIcon from './AIcon.vue'
-import Crumbs from './ui/Crumbs.vue'
-import SaveState from './ui/SaveState.vue'
 import StepComments from './ui/StepComments.vue'
-import Stepper from './ui/Stepper.vue'
 import { btnDeep, btnOutline } from './ui/styles'
 
 /**
- * One step of the visit on a page of its own: where you are, every step in a row, the step's
- * numbered questions (the default slot), and the way to the step before, the next one, or back to
- * the visit. An activity can also be moved and removed; the Start and End cannot.
+ * One step of the visit, under the experience's shared header and step row (drawn once by the
+ * experience page, so they never move): the step's name, one line saying what this step still needs, the step's numbered questions (the default slot), and
+ * the way to the step before, the next one, or back to the overview. Changes save as you go, so
+ * moving on never needs a "save" first. An activity can also be moved and removed; the Start and End cannot.
  */
 const props = defineProps<{
   a: Authoring
   stepKey: string
-  name: string
   base: string
-  saving: boolean
   fixes: FixRow[]
   movable?: boolean
   /** The open comments about this step. */
@@ -37,25 +33,38 @@ const prev = computed(() => keys.value[at.value - 1])
 const next = computed(() => keys.value[at.value + 1])
 const isl = computed(() => props.a.islands.findIndex((x) => x.key === props.stepKey))
 const go = (k: string) => router.push(`${props.base}/step/${k}`)
+/** What this step still needs, its own gaps and its hand-over to the next one. */
+const left = computed(() => props.fixes.filter((r) => r.key === props.stepKey))
+const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1)
+/** Brings the first missing thing of this step into view. */
+function showFirst() {
+  const el = document.querySelector('[data-miss]') as HTMLElement | null
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  el.classList.remove('flash')
+  void el.offsetWidth
+  el.classList.add('flash')
+}
 </script>
 
 <template>
-  <div class="mx-auto max-w-[760px] min-[1700px]:max-w-[1100px]">
-    <Crumbs :parts="[{ text: 'Experiences', to: '/experiences' }, { text: name, to: base }, { text: stepTitle(a, stepKey) }]" />
-    <Stepper :a="a" :current="stepKey" :base="base" :fixes="fixes" />
+  <div>
 
-    <div class="mb-5 flex flex-wrap items-center gap-4">
-      <span
-        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-        :style="{ color: stepTone(a, stepKey)[0], background: stepTone(a, stepKey)[1] }"
-      >
-        <AIcon :name="stepGlyph(a, stepKey)" cls="h-5 w-5" />
+    <!-- The step's name and its state on one line: ready, or how many things are left and the next one. -->
+    <div class="mb-4 mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1" role="status">
+      <h2 class="text-xl font-bold tracking-tight">{{ stepTitle(a, stepKey) }}</h2>
+      <template v-if="left.length">
+        <span class="inline-flex items-center gap-1.5 text-[13px] font-medium text-warning">
+          <span class="h-1.5 w-1.5 translate-y-[-1px] rounded-full bg-warning" aria-hidden="true" />{{ left.length }} to fix
+        </span>
+        <span class="text-[13px] text-muted-foreground">Next: {{ lower(left[0].gap) }}</span>
+        <button type="button" class="text-[13px] font-medium text-brand-deep hover:underline" @click="showFirst">Show me</button>
+      </template>
+      <span v-else class="inline-flex items-center gap-1 text-[13px] font-medium text-success">
+        <AIcon name="check" cls="h-3.5 w-3.5" />Ready<span class="font-normal text-muted-foreground">
+          · {{ next ? `You can go on to ${stepTitle(a, next)}.` : 'Go back to the overview to publish.' }}</span
+        >
       </span>
-      <div class="flex-1">
-        <div class="text-[12px] font-bold text-muted-foreground">Step {{ at + 1 }} of {{ keys.length }}</div>
-        <h1 class="w-fit text-2xl font-extrabold leading-tight tracking-tight">{{ stepTitle(a, stepKey) }}</h1>
-      </div>
-      <SaveState :saving="saving" />
     </div>
 
     <div class="space-y-5">
@@ -77,8 +86,8 @@ const go = (k: string) => router.push(`${props.base}/step/${k}`)
       <button v-if="prev" type="button" :class="btnOutline" @click="go(prev)"><AIcon name="left" />{{ stepTitle(a, prev) }}</button>
       <span v-else />
       <div class="flex flex-wrap gap-3">
-        <button v-if="next" type="button" :class="btnOutline" @click="go(next)">Next: {{ stepTitle(a, next) }}<AIcon name="arrow" /></button>
-        <button type="button" :class="btnDeep" @click="router.push(base)">Done</button>
+        <button type="button" :class="btnOutline" @click="router.push(base)">Back to overview</button>
+        <button v-if="next" type="button" :class="btnDeep" @click="go(next)">Next: {{ stepTitle(a, next) }}<AIcon name="arrow" /></button>
       </div>
     </div>
   </div>

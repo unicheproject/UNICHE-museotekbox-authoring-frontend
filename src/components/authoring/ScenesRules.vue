@@ -9,7 +9,6 @@ import {
   effectText,
   hasDisplay,
   mediaName,
-  or,
   presetOf,
   reachedFrom,
   sceneGaps,
@@ -196,10 +195,7 @@ const val = (e: Event) => (e.target as HTMLInputElement).value
 
 <template>
   <div class="mb-5">
-    <button type="button" class="mb-1 flex items-center gap-1.5 text-[13px] font-bold text-muted-foreground hover:text-brand-deep" @click="emit('back')">
-      ← {{ or(a.details.name, 'Untitled experience') }}
-    </button>
-    <h1 class="text-2xl font-extrabold tracking-tight">Scenes and rules</h1>
+    <h2 class="text-xl font-extrabold tracking-tight">Scenes and rules</h2>
     <p class="mt-1 max-w-2xl text-[12.5px] text-muted-foreground">
       What the steps of the visit turn into. For fixes the forms cannot make — and changes here are replaced if the activity’s own form is
       edited again.

@@ -146,6 +146,18 @@ export function errorStatus(error: unknown): number | undefined {
   return axios.isAxiosError(error) ? error.response?.status : undefined
 }
 
+/** The backend's machine-readable error `code` (e.g. `START_CARD_IN_USE`), if there is one. */
+export function errorCode(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error)) return undefined
+  return (error.response?.data as ErrorEnvelope | undefined)?.code ?? undefined
+}
+
+/** The backend's per-problem `details` lines, or an empty list. */
+export function errorDetails(error: unknown): string[] {
+  if (!axios.isAxiosError(error)) return []
+  return (error.response?.data as ErrorEnvelope | undefined)?.details ?? []
+}
+
 /**
  * Turn an axios/backend error into a human message. The backend returns an envelope of
  * `{ code, message, details[] }`; prefer the field-level `details`, then `message`, then a
@@ -166,9 +178,9 @@ export function describeError(error: unknown): string {
 
 /**
  * The four concrete kinds of scan object. The backend exposes a create/update endpoint per kind
- * (`…/scan-objects/coloured-cards`, `…/drafts`, …) and reports the kind back on the response as a
- * plain string with no documented vocabulary — so `resolveScanObjectKind` below recovers it
- * defensively rather than trusting an exact spelling.
+ * (`…/scan-objects/coloured-cards`, `…/drafts`, …) and reports the kind back on the response as one
+ * of these exact values. `resolveScanObjectKind` below still reads it defensively, so an unexpected
+ * value shows as "unrecognised" instead of breaking the page.
  */
 export type ScanObjectKind = 'COLOURED_CARD' | 'PRINTED_IMAGE' | 'THREE_D_PRINTED_OBJECT' | 'DRAFT'
 
@@ -180,12 +192,14 @@ export const CARD_COLOURS: CardColour[] = ['RED', 'GREEN', 'YELLOW', 'WHITE']
 export interface ScanObjectDto {
   id: number
   orgId: string
-  /** References a scan object type. The backend has no endpoint that lists or names these types. */
+  /** Its card type (`listScanObjectTypes`), or null for none. */
   scanObjectTypeId: number | null
   name: string
+  /** Unique across ALL organisations, not just this one. */
   rfidTag: string | null
+  /** Stored but unused by the backend (the "universal" idea lives on the card type now). */
   reusable: boolean
-  kind: string
+  kind: ScanObjectKind
   /** Coloured cards only. */
   colour: CardColour | null
   /** Printed images only — a reference, not an upload. */
@@ -207,11 +221,13 @@ export interface ColouredCardRequest extends ScanObjectBaseRequest {
 }
 
 export interface PrintedImageRequest extends ScanObjectBaseRequest {
-  imageUrl: string | null
+  /** Required (not blank, at most 255). */
+  imageUrl: string
 }
 
 export interface ThreeDPrintedObjectRequest extends ScanObjectBaseRequest {
-  modelRef: string | null
+  /** Required (not blank, at most 255). */
+  modelRef: string
 }
 
 export type DraftRequest = ScanObjectBaseRequest
@@ -318,15 +334,34 @@ export async function deleteScanObject(orgId: string, id: number): Promise<void>
 /**
  * A kind of object the museum uses ("Red card", "Vase replica"). Rules and the start scene refer to
  * a type, not to one physical object: any object of that type triggers them.
+ *
+ * Two special flags, never both: `universal` (a card that works anywhere in any experience; it
+ * cannot be a start card) and `exit` (the card that ends a visit; at most one per organisation).
+ * The app only lists and creates them (from the scan object form); there is no screen to change or
+ * delete one. The backend lets any member with access to the organisation create one.
  */
 export interface ScanObjectTypeDto {
   id: number
   orgId: string
   name: string
+  universal: boolean
+  exit: boolean
+}
+
+export interface CreateScanObjectTypeRequest {
+  name: string
+  universal: boolean
+  exit: boolean
 }
 
 export async function listScanObjectTypes(orgId: string): Promise<ScanObjectTypeDto[]> {
   const res = await http.get<ScanObjectTypeDto[]>(`/organisations/${orgId}/scan-object-types`)
+  return res.data
+}
+
+/** 400 `INVALID_SCAN_OBJECT_TYPE` (both flags), 409 `EXIT_CARD_TYPE_TAKEN`. */
+export async function createScanObjectType(orgId: string, body: CreateScanObjectTypeRequest): Promise<ScanObjectTypeDto> {
+  const res = await http.post<ScanObjectTypeDto>(`/organisations/${orgId}/scan-object-types`, body)
   return res.data
 }
 
@@ -336,9 +371,13 @@ export interface BoxDto {
   id: number
   orgId: string
   name: string
+  /** Unique across ALL organisations, not just this one. */
   serialNumber: string
-  /** `ONLINE` or `OFFLINE` (the backend's BoxStatus enum); read it through `boxOnline()`. */
-  status: string
+  /**
+   * The backend's BoxStatus enum; read it through `boxOnline()`. Nothing in the backend updates it
+   * yet, so in practice it stays `OFFLINE` — show that as "not reported", not as offline.
+   */
+  status: 'ONLINE' | 'OFFLINE'
   /** The experience the box is currently running, if any. */
   currentProjectId: string | null
 }
@@ -349,8 +388,8 @@ export interface BoxRequest {
 }
 
 /**
- * The box `status` is an undocumented string, so treat anything that reads as "online" as online
- * and everything else — including an empty value — as not online. Never invent a third state.
+ * Read the box `status` tolerantly: anything that reads as "online" is online, everything else —
+ * including an empty value — is not. Never invent a third state.
  */
 export function boxOnline(status: string | null | undefined): boolean {
   return (status ?? '').toUpperCase().replace(/[^A-Z]/g, '') === 'ONLINE'
@@ -399,16 +438,18 @@ export async function deleteBox(orgId: string, boxId: number): Promise<void> {
 }
 
 /**
- * Organisation members, as returned by GET /organisations/{orgId}/members. `displayName` and
- * `email` come from the IdP profile, so either can be missing for an account that has never signed
- * in; `since` is the ISO instant the person joined the organisation.
+ * Organisation members, as returned by GET /organisations/{orgId}/members. The backend builds the
+ * list from the Catalogue: the organisation's managers (`MANAGER`) and the people who accepted an
+ * invitation to one of its experiences (`CURATOR`), one row per email, MANAGER winning.
  */
 export interface MemberDto {
-  /** Null for a person who exists only as an invitation/local row and has no IdP account yet. */
+  /** Null for every CURATOR row: invitations carry no account id. */
   userId: string | null
-  email: string | null
+  email: string
+  /** Null for every CURATOR row. */
   displayName: string | null
-  role: string | null
+  role: 'MANAGER' | 'CURATOR'
+  /** When the role was granted or the invitation was made — not when they joined the organisation. */
   since: string | null
 }
 
@@ -433,8 +474,9 @@ export type BlockType = 'TEXT' | 'IMAGE' | 'ILLUSTRATION' | 'VIDEO' | 'SCREEN' |
 export const BLOCK_TYPES: BlockType[] = ['TEXT', 'IMAGE', 'ILLUSTRATION', 'VIDEO', 'SCREEN', 'AUDIO', 'BOX_VIDEO']
 
 /**
- * Rule model v2: when (trigger) … if (condition) … do (effects, in order) … then (destination).
- * Of the rules of a scene whose trigger matches, the first by position whose condition holds runs.
+ * Rule model v2: when (trigger) … if (conditions) … do (effects, in order) … then (destination).
+ * Of the rules of a scene whose trigger matches, the first by position whose conditions all hold
+ * runs; an empty `conditions` list always holds.
  */
 export type TriggerType = 'SCAN' | 'SCAN_OTHER' | 'TIMER_ELAPSED' | 'VIDEO_ENDED' | 'SCENE_ENTERED' | 'SESSION_STARTED'
 export type DestinationType = 'GO_TO' | 'STAY' | 'END'
@@ -502,7 +544,8 @@ export interface RuleDto {
   ruleKey: ElementKey
   position: number
   trigger: TriggerDto
-  condition: ConditionDto | null
+  /** All must hold (AND); empty = always. The backend binds `conditions` only — a single `condition` field is ignored. */
+  conditions: ConditionDto[]
   effects: EffectDto[]
   destination: DestinationDto
 }
@@ -569,11 +612,12 @@ function sceneFromWire(raw: SceneDto & { start?: boolean }): SceneDto {
     ...scene,
     isStart: raw.isStart ?? start ?? false,
     blocks: raw.blocks ?? [],
-    rules: raw.rules ?? [],
+    rules: (raw.rules ?? []).map((r) => ({ ...r, conditions: r.conditions ?? [] })),
   }
 }
 
-function experienceFromWire(raw: ExperienceDto): ExperienceDto {
+/** Normalises a whole experience document off the wire. Exported for tests. */
+export function experienceFromWire(raw: ExperienceDto): ExperienceDto {
   return {
     ...raw,
     output: raw.output ?? null,
@@ -656,6 +700,44 @@ export function createKeyAllocator(experience: ExperienceDto): KeyAllocator {
     sceneKey: () => String(scene++),
     blockKey: () => String(block++),
     ruleKey: () => String(rule++),
+  }
+}
+
+// ─────────────────────────── Publishing ───────────────────────────
+//
+// Publishing freezes the saved document as a new numbered version; Boxes always play the latest
+// published version, never the draft. A project must be published before it can be put on a Box.
+// Publishing and Box assignment are org-manager actions (403 otherwise).
+
+export interface PublishStatusDto {
+  /** The latest published version, counting from 1. */
+  version: number
+  /** The document version that copy was taken from. */
+  docVersion: number
+  publishedAt: string
+  /** The document has been saved since that copy was taken. */
+  hasUnpublishedChanges: boolean
+  /** Things worth knowing that do not block publishing (e.g. the organisation has no Exit card). */
+  warnings: string[]
+}
+
+/**
+ * Publish what is saved now. Doing it again with nothing changed returns the same version.
+ * 422 `EXPERIENCE_NOT_READY` (gaps in `details`), 409 `START_CARD_IN_USE`, 403 if not a manager.
+ */
+export async function publishExperience(projectId: string): Promise<PublishStatusDto> {
+  const res = await http.post<PublishStatusDto>(`/projects/${projectId}/publish`)
+  return { ...res.data, warnings: res.data.warnings ?? [] }
+}
+
+/** The latest published version, or null if it has never been published. */
+export async function getPublishStatus(projectId: string): Promise<PublishStatusDto | null> {
+  try {
+    const res = await http.get<PublishStatusDto>(`/projects/${projectId}/published`)
+    return { ...res.data, warnings: res.data.warnings ?? [] }
+  } catch (e) {
+    if (errorStatus(e) === 404 && errorCode(e) === 'EXPERIENCE_NOT_PUBLISHED') return null
+    throw e
   }
 }
 

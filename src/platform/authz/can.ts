@@ -22,3 +22,23 @@ export function can(
   if (ref.projectId && ctx.projectMemberships.some((m) => m.projectId === ref.projectId)) return true
   return false
 }
+
+/**
+ * Whether the caller may do an organisation-manager action (publish, put an experience on a Box,
+ * create or change Boxes): a platform admin, or a manager of that organisation. Project
+ * membership is not enough. Mirrors the backend's `requireManager`; UX gating only.
+ */
+export function canManageOrg(ctx: AuthorizationContext | null | undefined, orgId: string | null | undefined): boolean {
+  if (!ctx || !orgId) return false
+  return ctx.platformAdmin || ctx.managedOrganisations.includes(orgId)
+}
+
+/**
+ * Whether the caller manages anything: a platform admin, or a manager of at least one
+ * organisation. For what only managers see at all (the Members screen in the sidebar, the
+ * Dashboard's members count and idle Boxes). UX gating only.
+ */
+export function managesAnyOrg(ctx: AuthorizationContext | null | undefined): boolean {
+  if (!ctx) return false
+  return ctx.platformAdmin || ctx.managedOrganisations.length > 0
+}

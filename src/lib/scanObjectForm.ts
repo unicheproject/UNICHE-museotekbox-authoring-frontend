@@ -10,8 +10,10 @@ import type {
  * to other kinds simply sit unused, which keeps what the user typed if they switch kind and switch
  * back mid-form.
  *
- * `scanObjectTypeId` is a string because it is bound to a text input: there is no endpoint listing
- * scan object types yet, so the user has to enter the id (see docs/BACKEND-GAPS.md).
+ * `scanObjectTypeId` is a string because it is bound to the card-type select ('' = no type).
+ *
+ * `reusable` is not shown (the backend stores it but no longer uses it); it is still carried so an
+ * edit sends back the value the object already has instead of resetting it.
  */
 export interface ScanObjectFormModel {
   kind: ScanObjectKind
@@ -54,6 +56,9 @@ export function scanObjectToForm(
   }
 }
 
+/** The backend's limit on every text field of a scan object. */
+export const MAX_TEXT = 255
+
 /** Blank text means "no value", which the API expresses as null rather than an empty string. */
 function orNull(value: string): string | null {
   const trimmed = value.trim()
@@ -79,18 +84,42 @@ export function toScanObjectRequest(form: ScanObjectFormModel): ScanObjectReques
   switch (form.kind) {
     case 'COLOURED_CARD':
       return { ...base, colour: form.colour }
+    // Required by the backend for these kinds; the form does not submit them blank.
     case 'PRINTED_IMAGE':
-      return { ...base, imageUrl: orNull(form.imageUrl) }
+      return { ...base, imageUrl: form.imageUrl.trim() }
     case 'THREE_D_PRINTED_OBJECT':
-      return { ...base, modelRef: orNull(form.modelRef) }
+      return { ...base, modelRef: form.modelRef.trim() }
     case 'DRAFT':
       return base
   }
 }
 
-/** A form is submittable once it has the fields its kind cannot do without. */
+/**
+ * What is wrong with the form, per field, by the backend's own rules: a name; an image reference
+ * for a printed image; a model reference for a 3D object; at most 255 characters each. `colour`
+ * always has a value. Only the fields of the chosen kind are checked.
+ */
+export function scanObjectFormErrors(form: ScanObjectFormModel): Record<string, string> {
+  const errors: Record<string, string> = {}
+  const tooLong = (v: string) => v.trim().length > MAX_TEXT
+  const limit = `At most ${MAX_TEXT} characters`
+
+  if (!form.name.trim()) errors.name = 'Give it a name'
+  else if (tooLong(form.name)) errors.name = limit
+
+  if (form.kind === 'PRINTED_IMAGE') {
+    if (!form.imageUrl.trim()) errors.imageUrl = 'A printed image needs its image reference'
+    else if (tooLong(form.imageUrl)) errors.imageUrl = limit
+  }
+  if (form.kind === 'THREE_D_PRINTED_OBJECT') {
+    if (!form.modelRef.trim()) errors.modelRef = 'A 3D printed object needs its model reference'
+    else if (tooLong(form.modelRef)) errors.modelRef = limit
+  }
+  if (tooLong(form.rfidTag)) errors.rfidTag = limit
+  return errors
+}
+
+/** A form is submittable once nothing is wrong with it. */
 export function scanObjectFormComplete(form: ScanObjectFormModel): boolean {
-  if (!form.name.trim()) return false
-  // `colour` is the only field the backend marks required, and it always has a default.
-  return true
+  return Object.keys(scanObjectFormErrors(form)).length === 0
 }

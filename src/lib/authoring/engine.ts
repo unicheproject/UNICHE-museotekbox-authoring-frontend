@@ -396,8 +396,8 @@ function questionBlocks(a: Authoring, q: Cfg): Block[] {
 // ─────────────────────────── replies ───────────────────────────
 
 export const REPLY_KINDS: { key: ReplyKind; label: string; hint: string }[] = [
-  { key: 'correct', label: 'When they get it right', hint: 'Shown the moment the right object is scanned.' },
-  { key: 'hint', label: 'When they ask for a clue', hint: 'Shown when the hint object is scanned. The question stays up.' },
+  { key: 'correct', label: 'When they get it right', hint: 'Shown the moment the right scan is placed.' },
+  { key: 'hint', label: 'When they ask for a clue', hint: 'Shown when the clue scan is placed. The question stays up.' },
   { key: 'wrong', label: 'When anything else is scanned', hint: 'The catch-all. The question stays up so they can try again.' },
 ]
 
@@ -509,11 +509,11 @@ export const TEMPLATES: Template[] = [
   {
     id: 'quiz',
     name: 'Quiz',
-    tagline: 'Questions answered by putting an object on the Box',
+    tagline: 'Questions answered by putting a scan on the Box',
     icon: 'quiz',
     badge: 'Most used',
     blurb:
-      'The visitor is asked a question, and answers by placing an object on the Box. Right, wrong and "give me a clue" each get their own reply. A result closes the game.',
+      'The visitor is asked a question, and answers by placing a scan on the Box. Right, wrong and "give me a clue" each get their own reply. A result closes the game.',
     example: ['Start', 'Question ×N', 'Result'],
     rulesLabel: 'Rules',
     rulesTitle: 'How the quiz is played',
@@ -538,7 +538,7 @@ export const TEMPLATES: Template[] = [
       const n = questionsOnly(qs).length
       const info = qs.length - n
       const target = cfg.winMode === 'all' ? n : whole(cfg.winCount)
-      return `${n} question${n === 1 ? '' : 's'}${info ? ` · ${info} information` : ''} · wins with ${target || '—'} right`
+      return `${n} question${n === 1 ? '' : 's'}${info ? ` · ${info} slide${info === 1 ? '' : 's'}` : ''} · wins with ${target || '—'} right`
     },
     thumb: (cfg) =>
       (cfg.questions || [])
@@ -589,7 +589,7 @@ export const TEMPLATES: Template[] = [
         ;[...(q.customs || []), ...(cfg.customs || [])].forEach((c: Cfg) => {
           if (!c.scan) return
           rules.push(
-            rule('Reply for ' + or(scanName(a, c.scan), 'an object'), onScan(card(c.scan)), {
+            rule('Reply for ' + or(scanName(a, c.scan), 'a scan'), onScan(card(c.scan)), {
               effects: [reply({ color: c.color, text: or(c.text, '…'), audio: c.audio }), addNum('wrong', 1)],
               destination: STAY,
             }),
@@ -634,7 +634,7 @@ export const TEMPLATES: Template[] = [
               how === 'video'
                 ? rule('When the video ends', onVideo(), { destination: goTo(next(i)) })
                 : how === 'scan'
-                  ? rule('Any object moves on', onOther(), { destination: goTo(next(i)) })
+                  ? rule('Any scan moves on', onOther(), { destination: goTo(next(i)) })
                   : rule('Move on', onSeconds(secs(q.seconds)), { destination: goTo(next(i)) }),
             ],
           })
@@ -697,10 +697,10 @@ export const TEMPLATES: Template[] = [
     tagline: 'Each object tells its own story',
     icon: 'scan',
     blurb:
-      'The visitor picks up any object and puts it on the Box. It plays that object’s story. Any order, any number of times.',
+      'The visitor picks up any scan and puts it on the Box. It plays that scan’s story. Any order, any number of times.',
     example: ['Choose', 'A story per object', 'Done'],
     fields: [
-      { key: 'opening', type: 'opening', label: 'While the visitor chooses', help: 'What the screen shows while it waits for an object.' },
+      { key: 'opening', type: 'opening', label: 'While the visitor chooses', help: 'What the screen shows while it waits for a scan.' },
       {
         key: 'objects',
         type: 'list',
@@ -734,7 +734,7 @@ export const TEMPLATES: Template[] = [
             name: 'Pick something up',
             kind: 'intro',
             role: 'start',
-            blocks: hasDisplay(a) ? [mediaBlock(cfg.openingMedia, 'Choose an object')] : [AUDIO(or(cfg.openingAudio, 'welcome audio'))],
+            blocks: hasDisplay(a) ? [mediaBlock(cfg.openingMedia, 'Choose a scan')] : [AUDIO(or(cfg.openingAudio, 'welcome audio'))],
             rules: [...open(-1), ...finish()],
           },
           ...(cfg.objects as Cfg[]).map(
@@ -1101,8 +1101,8 @@ export const LINK_HOW: Record<LinkHow, string> = {
   now: 'Right away',
   time: 'After a few seconds',
   video: 'When the video ends',
-  scan: 'When a chosen object is placed',
-  any: 'When any object is placed',
+  scan: 'When a chosen scan is placed',
+  any: 'When any scan is placed',
 }
 
 export interface LinkInfo {
@@ -1137,9 +1137,9 @@ export function linkInfo(a: Authoring, fromKey: string): LinkInfo {
         : link.how === 'scan'
           ? link.scan
             ? `when ${esc(scanName(a, link.scan))} is placed`
-            : 'when an object is placed'
+            : 'when a scan is placed'
           : link.how === 'any'
-            ? 'when any object is placed'
+            ? 'when any scan is placed'
             : `after ${n} s`
   const phrase =
     link.how === 'now'
@@ -1147,15 +1147,15 @@ export function linkInfo(a: Authoring, fromKey: string): LinkInfo {
       : link.how === 'video'
         ? `when the video on ${where} ends`
         : link.how === 'scan'
-          ? `when ${link.scan ? chip(scanType(a, link.scan)) : '<b class="text-warning">an object — not chosen yet —</b>'} is placed on the Box`
+          ? `when ${link.scan ? chip(scanType(a, link.scan)) : '<b class="text-warning">a scan — not chosen yet —</b>'} is placed on the Box`
           : link.how === 'any'
-            ? 'when any object is placed on the Box'
+            ? 'when any scan is placed on the Box'
             : `after <b>${n} seconds</b> on ${where}`
   const warn =
     link.how === 'video' && !hasVideo
       ? `There is no video on ${where} to wait for.`
       : link.how === 'scan' && !link.scan
-        ? 'Choose the object that moves the visitor on.'
+        ? 'Choose the scan that moves the visitor on.'
         : ''
   return { i, link, fromName, target, where, hasVideo, short, phrase, warn }
 }
@@ -1179,15 +1179,15 @@ export function reachedFrom(a: Authoring, key: string) {
 export function sceneGaps(a: Authoring, sc: Scene, opts: { skipLinks?: boolean } = {}): string[] {
   const gaps: string[] = []
   if (!reachedFrom(a, sc.id).length && !sc.initCard) {
-    gaps.push(sc.start ? 'Nothing starts the visit here' : 'Nothing leads here and it has no object of its own')
+    gaps.push(sc.start ? 'Nothing starts the visit here' : 'Nothing leads here and it has no scan of its own')
   }
   sc.rules.forEach((r) => {
     if (opts.skipLinks && r.link) return
     if (r.trigger.type === 'SCAN' && !r.trigger.cardTypeId && !(sc.needsCorrect && r.label === 'Right answer'))
-      gaps.push(`“${r.label}” has no object yet`)
+      gaps.push(`“${r.label}” has no scan yet`)
     if (r.trigger.type === 'TIMER_ELAPSED' && !r.trigger.seconds) gaps.push(`“${r.label}” waits zero seconds`)
   })
-  if (sc.needsCorrect) gaps.push('No right object chosen')
+  if (sc.needsCorrect) gaps.push('No right scan chosen')
   if (sc.needsContent) gaps.push(hasDisplay(a) ? 'Nothing to show on the screen' : 'No sound recorded')
   if (sc.needsVideo) gaps.push('Waits for a video that is not there')
   return gaps
@@ -1212,7 +1212,17 @@ export interface FixRow {
 export function fixRows(a: Authoring): FixRow[] {
   const rows: FixRow[] = []
   for (const k of ['start', ...a.islands.map((x) => x.key), 'end']) {
-    for (const g of stepGaps(a, k)) rows.push({ key: k, link: false, where: stepName(a, k), gap: g })
+    const own = stepGaps(a, k)
+    for (const g of own) rows.push({ key: k, link: false, where: stepName(a, k), gap: g })
+    // A quiz item can miss something its scene does not show (a ready-made screen's words, two
+    // answers on one object). Listed too, so the overview, the step and the item agree.
+    const isl = a.islands.find((x) => x.key === k)
+    if (isl?.templateId === 'quiz') {
+      const qs: Cfg[] = isl.cfg.questions || []
+      for (const q of qs)
+        for (const g of questionGaps(a, q))
+          if (!own.includes(g)) rows.push({ key: k, link: false, where: stepName(a, k), gap: `${isInfo(q) ? 'Slide' : itemLabel(qs, q)}: ${g}` })
+    }
     if (k !== 'end') {
       const l = linkInfo(a, k)
       if (l.warn) rows.push({ key: k, link: true, where: stepName(a, k) + ' → next', gap: l.warn })
@@ -1227,12 +1237,12 @@ export function fixRows(a: Authoring): FixRow[] {
 export const INFO_MOVE: Record<string, string> = {
   time: 'After a few seconds',
   video: 'When the video ends',
-  scan: 'When any object is placed on the Box',
+  scan: 'When any scan is placed on the Box',
 }
 
 export function infoSummary(a: Authoring, q: Cfg) {
   const how = infoMoveOn(a, q)
-  return how === 'time' ? `moves on after ${secs(q.seconds)}s` : how === 'video' ? 'moves on when the video ends' : 'moves on with any object'
+  return how === 'time' ? `moves on after ${secs(q.seconds)}s` : how === 'video' ? 'moves on when the video ends' : 'moves on with any scan'
 }
 
 /** What a question or information item still needs. */
@@ -1245,7 +1255,7 @@ export function questionGaps(a: Authoring, q: Cfg): string[] {
     return g
   }
   if (usesScreen(a, q)) return screenGaps(q)
-  if (!q.correct) g.push('No right object chosen')
+  if (!q.correct) g.push('No right scan chosen')
   if (!hasShow) g.push(hasDisplay(a) ? 'Nothing to show' : 'No sound recorded')
   return g
 }
@@ -1258,9 +1268,9 @@ export function screenGaps(q: Cfg): string[] {
   if (!String(q.ask || '').trim()) g.push('The question has no words yet')
   if (p.media && !q.screenMedia) g.push(p.media === 'VIDEO' ? 'No video chosen' : 'No picture chosen')
   if (ans.some((x) => !String(x.text || '').trim() && !x.media)) g.push('An answer has no words yet')
-  if (ans.some((x) => !x.scan)) g.push('An answer has no object yet')
+  if (ans.some((x) => !x.scan)) g.push('An answer has no scan yet')
   const objs = ans.map((x) => x.scan).filter(Boolean)
-  if (new Set(objs).size < objs.length) g.push('Two answers use the same object')
+  if (new Set(objs).size < objs.length) g.push('Two answers use the same scan')
   if (!(typeof q.right === 'number' && q.right >= 0 && q.right < ans.length)) g.push('No right answer chosen')
   return g
 }
@@ -1296,11 +1306,11 @@ export function validate(a: Authoring, owned?: Map<string, number>): Check[] {
   const unbound = scenes.find((s) => s.rules.some((r) => r.trigger.type === 'SCAN' && !r.trigger.cardTypeId))
   check(
     !unbound,
-    'Every rule that waits for an object has one chosen',
-    `A rule in “${unbound?.name}” waits for an object that has not been chosen`,
+    'Every rule that waits for a scan has one chosen',
+    `A rule in “${unbound?.name}” waits for a scan that has not been chosen`,
   )
   const noCorrect = scenes.find((s) => s.needsCorrect)
-  check(!noCorrect, 'Every question has a right object', `“${noCorrect?.name}” has no right object`)
+  check(!noCorrect, 'Every question has a right scan', `“${noCorrect?.name}” has no right scan`)
   const noContent = scenes.find((s) => s.needsContent)
   check(
     !noContent,

@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import type { ScanType } from '@/lib/authoring/engine'
+import { managesAnyOrg } from '@/platform/authz'
+import { useAuthzStore } from '@/stores/authz'
 import AIcon from '../AIcon.vue'
-import { bigInput, btnDeep, btnOutline, overlay } from './styles'
+import { bigInput, btnDeep, btnOutline, dialogBody, dialogBox, dialogClose, dialogHead, dialogTitle, overlay } from './styles'
 
 /**
  * Every scan the museum has, as tiles, and at the end a way to name one of your own — an experience
  * gets written before the objects are printed, so the author is not held to the list.
+ * With no scan objects at all (a new organisation), it first says where they come from: a name of
+ * your own is not a real card, and nothing can be published without one to start the visit.
  */
 const props = defineProps<{ types: ScanType[]; modelValue: string }>()
 const emit = defineEmits<{ pick: [value: string]; close: [] }>()
+
+/** Whether to offer the way to Scan objects (UX gating only; the backend decides). */
+const { context } = storeToRefs(useAuthzStore())
+const canAdd = computed(() => managesAnyOrg(context.value))
 
 const adding = ref(false)
 const typed = ref('')
@@ -41,14 +51,26 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 <template>
   <Teleport to="body">
     <div :class="overlay" @click.self="emit('close')">
-      <div role="dialog" aria-modal="true" aria-label="Choose a scan" class="dialog-in w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div class="flex items-center gap-3 border-b border-border px-7 py-5">
-          <h2 class="flex-1 text-[16px] font-extrabold">Choose a scan</h2>
-          <button type="button" aria-label="Close" class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2" @click="emit('close')">
+      <div role="dialog" aria-modal="true" aria-label="Choose a scan object" :class="[dialogBox, 'max-w-2xl']">
+        <div :class="[dialogHead, 'items-center']">
+          <h2 :class="[dialogTitle, 'min-w-0 flex-1']">Choose a scan object</h2>
+          <button type="button" title="Close" aria-label="Close" :class="dialogClose" @click="emit('close')">
             <AIcon name="x" cls="h-5 w-5" />
           </button>
         </div>
-        <div class="grid max-h-[70vh] gap-2.5 overflow-y-auto p-7 sm:grid-cols-2">
+        <div :class="[dialogBody, 'grid content-start gap-2.5 sm:grid-cols-2']">
+          <!-- None registered yet: where they come from, before anything else. -->
+          <div v-if="!types.length" class="flex flex-col items-center px-4 pb-4 pt-2 text-center sm:col-span-2">
+            <span class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-deep/[.07] text-brand-deep" aria-hidden="true">
+              <AIcon name="scan" cls="h-5 w-5" />
+            </span>
+            <p class="text-sm font-bold">No scan objects yet</p>
+            <p class="mt-1.5 max-w-md text-[13.5px] leading-relaxed text-muted-foreground">
+              A visit starts when a visitor places a scan object on the Box.
+              {{ canAdd ? 'Add one first.' : 'Ask your organisation manager to add scan objects.' }}
+            </p>
+            <RouterLink v-if="canAdd" to="/scan-objects" :class="[btnDeep, 'mt-4']" @click="emit('close')">Go to Scan objects</RouterLink>
+          </div>
           <button
             v-for="t in types"
             :key="t.id"
@@ -69,7 +91,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
           >
             <span class="flex h-7 w-7 shrink-0 items-center justify-center"><AIcon name="scan" cls="h-6 w-6" /></span>
             <span class="min-w-0 flex-1 truncate">{{ own }}</span>
-            <span class="shrink-0 rounded-pill bg-amber-100 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not registered yet</span>
+            <span class="shrink-0 rounded-pill bg-warning/10 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not registered yet</span>
             <AIcon name="check" cls="h-5 w-5" />
           </button>
           <div v-if="adding" class="rounded-md border border-brand-deep bg-brand-deep/[.03] p-4 sm:col-span-2">

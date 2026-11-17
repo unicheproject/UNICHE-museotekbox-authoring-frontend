@@ -4,7 +4,7 @@ import { describeError } from '@/api/museotekBox'
 import { MEDIA } from '@/lib/authoring/engine'
 import { acceptFor, addToLibrary, kindsFor, thumbOf, type PickKind } from '@/lib/authoring/media'
 import AIcon from '../AIcon.vue'
-import { bigInput, btnDeep, btnOutline, overlay } from './styles'
+import { bigInput, btnDeep, btnOutline, dialogBody, dialogBox, dialogClose, dialogHead, dialogTitle, overlay } from './styles'
 
 /**
  * The museum's library of one kind, as big tiles: pick one, upload a new file (it is added and
@@ -65,68 +65,70 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
 <template>
   <Teleport to="body">
     <div :class="overlay" @click.self="emit('close')">
-      <div role="dialog" aria-modal="true" :aria-label="`Your ${word}`" class="dialog-in w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div class="flex items-center gap-3 border-b border-border px-7 py-5">
-          <h2 class="flex-1 text-[20px] font-extrabold">Your {{ word }}</h2>
-          <button type="button" :class="btnOutline" :disabled="progress != null" @click="file?.click()">
+      <div role="dialog" aria-modal="true" :aria-label="`Your ${word}`" :class="[dialogBox, 'max-w-3xl']">
+        <div :class="[dialogHead, 'items-center']">
+          <h2 :class="[dialogTitle, 'min-w-0 flex-1']">Your {{ word }}</h2>
+          <button type="button" aria-label="Upload" :class="[btnOutline, '!py-2']" :disabled="progress != null" @click="file?.click()">
             <AIcon name="upload" /><span class="hidden sm:inline">{{ progress != null ? `Uploading… ${progress}%` : 'Upload' }}</span>
           </button>
-          <button type="button" aria-label="Close" class="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2" @click="emit('close')">
+          <button type="button" title="Close" aria-label="Close" :class="dialogClose" @click="emit('close')">
             <AIcon name="x" cls="h-5 w-5" />
           </button>
         </div>
-        <p v-if="error" class="mx-7 mt-5 rounded-md bg-destructive/[.06] px-4 py-3 text-[13px] font-bold text-destructive">{{ error }}</p>
-        <div class="grid max-h-[65vh] grid-cols-2 gap-4 overflow-y-auto p-7 sm:grid-cols-3">
-          <button
-            v-for="m in list"
-            :key="m.id"
-            type="button"
-            class="overflow-hidden rounded-xl border-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-            :class="modelValue === m.id ? 'border-brand-deep' : 'border-border hover:border-brand-deep/60'"
-            @click="emit('pick', m.id)"
-          >
-            <span class="relative flex aspect-video w-full items-center justify-center bg-surface-2 text-brand-deep">
-              <template v-if="m.kind !== 'AUDIO' && thumbOf(m.id)">
-                <video v-if="m.kind === 'VIDEO'" :src="`${thumbOf(m.id)}#t=0.1`" muted playsinline preload="metadata" class="h-full w-full object-cover" />
-                <img v-else :src="thumbOf(m.id)" alt="" class="h-full w-full object-cover" />
-              </template>
-              <AIcon v-else :name="iconOf(m.kind)" cls="h-8 w-8" />
-            </span>
-            <span class="flex items-center gap-2 px-3 py-2 text-[13px] font-semibold">
-              <AIcon :name="iconOf(m.kind)" cls="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span class="truncate">{{ m.name }}</span>
-            </span>
-          </button>
-          <button
-            v-if="own"
-            type="button"
-            class="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-brand-deep px-3 text-center text-[13px] font-semibold"
-            @click="emit('pick', own)"
-          >
-            <span class="truncate">{{ own }}</span>
-            <span class="rounded-pill bg-amber-100 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not uploaded yet</span>
-          </button>
-          <div v-if="naming" class="col-span-2 rounded-xl border-2 border-brand-deep bg-brand-deep/[.03] p-4 sm:col-span-3">
-            <div class="flex flex-wrap items-center gap-3">
-              <input
-                ref="box"
-                v-model="typed"
-                placeholder="Name the file you will upload"
-                autocomplete="off"
-                :class="[bigInput, '!w-auto min-w-0 flex-1 !py-2.5']"
-                @keydown.enter="addNamed"
-              />
-              <button type="button" :disabled="!typed.trim()" :class="[btnDeep, '!py-3']" @click="addNamed">Add</button>
-              <button type="button" :class="[btnOutline, '!py-3']" @click="naming = false">Cancel</button>
+        <div :class="dialogBody">
+          <p v-if="error" role="alert" class="mb-5 rounded-md bg-destructive/[.06] px-4 py-3 text-[13px] font-bold text-destructive">{{ error }}</p>
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            <button
+              v-for="m in list"
+              :key="m.id"
+              type="button"
+              class="overflow-hidden rounded-xl border-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+              :class="modelValue === m.id ? 'border-brand-deep' : 'border-border hover:border-brand-deep/60'"
+              @click="emit('pick', m.id)"
+            >
+              <span class="relative flex aspect-video w-full items-center justify-center bg-surface-2 text-brand-deep">
+                <template v-if="m.kind !== 'AUDIO' && thumbOf(m.id)">
+                  <video v-if="m.kind === 'VIDEO'" :src="`${thumbOf(m.id)}#t=0.1`" muted playsinline preload="metadata" class="h-full w-full object-cover" />
+                  <img v-else :src="thumbOf(m.id)" alt="" class="h-full w-full object-cover" />
+                </template>
+                <AIcon v-else :name="iconOf(m.kind)" cls="h-8 w-8" />
+              </span>
+              <span class="flex items-center gap-2 px-3 py-2 text-[13px] font-semibold">
+                <AIcon :name="iconOf(m.kind)" cls="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span class="truncate">{{ m.name }}</span>
+              </span>
+            </button>
+            <button
+              v-if="own"
+              type="button"
+              class="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-brand-deep px-3 text-center text-[13px] font-semibold"
+              @click="emit('pick', own)"
+            >
+              <span class="truncate">{{ own }}</span>
+              <span class="rounded-pill bg-warning/10 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not uploaded yet</span>
+            </button>
+            <div v-if="naming" class="col-span-2 rounded-xl border-2 border-brand-deep bg-brand-deep/[.03] p-4 sm:col-span-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <input
+                  ref="box"
+                  v-model="typed"
+                  placeholder="Name the file you will upload"
+                  autocomplete="off"
+                  :class="[bigInput, '!w-auto min-w-0 flex-1 !py-2.5']"
+                  @keydown.enter="addNamed"
+                />
+                <button type="button" :disabled="!typed.trim()" :class="[btnDeep, '!py-3']" @click="addNamed">Add</button>
+                <button type="button" :class="[btnOutline, '!py-3']" @click="naming = false">Cancel</button>
+              </div>
             </div>
+            <button
+              v-else
+              type="button"
+              class="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-deep/30 text-[15px] font-extrabold text-brand-deep hover:border-brand-deep hover:bg-brand-deep/[.03]"
+              @click="startNaming"
+            >
+              <AIcon name="plus" cls="h-5 w-5" />Something else…
+            </button>
           </div>
-          <button
-            v-else
-            type="button"
-            class="flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-deep/30 text-[15px] font-extrabold text-brand-deep hover:border-brand-deep hover:bg-brand-deep/[.03]"
-            @click="startNaming"
-          >
-            <AIcon name="plus" cls="h-5 w-5" />Something else…
-          </button>
         </div>
         <input ref="file" type="file" :accept="acceptFor(kind)" class="hidden" @change="onFile" />
       </div>

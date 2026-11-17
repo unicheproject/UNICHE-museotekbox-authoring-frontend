@@ -71,37 +71,40 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div class="fixed inset-0 bg-black/50" @click="close" />
+    <!-- Same pattern as the authoring dialogs: centred, capped to the viewport, one scroll area (the
+         fields), header and footer always visible. `dialog-overlay` locks the page underneath. -->
+    <div v-if="open" class="dialog-overlay fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-10">
+      <div class="fixed inset-0 bg-[#0b1020]/50 backdrop-blur-[2px]" @click="close" />
       <div
         ref="panel"
         role="dialog"
         aria-modal="true"
         :aria-label="title"
-        class="relative z-10 w-full max-w-lg rounded-lg border bg-background shadow-lg"
+        class="dialog-in relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-background shadow-2xl sm:max-h-[min(calc(100dvh-5rem),56rem)]"
       >
-        <form novalidate @submit.prevent="emit('submit')">
-          <div class="flex items-start justify-between gap-4 border-b px-6 py-4">
-            <div>
-              <h2 class="text-lg font-extrabold tracking-[-0.01em]">{{ title }}</h2>
-              <p v-if="description" class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
+        <form novalidate class="flex min-h-0 flex-1 flex-col" @submit.prevent="emit('submit')">
+          <div class="flex shrink-0 items-start gap-3 border-b border-border px-5 py-4 sm:px-7">
+            <div class="min-w-0 flex-1">
+              <h2 class="text-[17px] font-extrabold leading-tight">{{ title }}</h2>
+              <p v-if="description" class="mt-1 text-[13px] leading-snug text-muted-foreground">{{ description }}</p>
             </div>
             <button
               type="button"
+              title="Close"
               aria-label="Close"
-              class="-mr-1 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+              class="-mr-1.5 shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
               @click="close"
             >
-              <X class="h-4 w-4" />
+              <X class="h-5 w-5" />
             </button>
           </div>
 
-          <div class="space-y-4 px-6 py-5">
+          <div class="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6">
             <Alert v-if="error" variant="error">{{ error }}</Alert>
             <slot />
           </div>
 
-          <div class="flex justify-end gap-2 border-t px-6 py-4">
+          <div class="flex shrink-0 flex-wrap justify-end gap-2 border-t border-border bg-background px-5 py-4 sm:px-7">
             <Button type="button" variant="outline" :disabled="busy" @click="close">
               {{ cancelLabel }}
             </Button>

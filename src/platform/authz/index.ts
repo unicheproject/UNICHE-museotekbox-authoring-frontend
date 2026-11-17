@@ -2,7 +2,7 @@ import { fetchAuthorization } from '@/api/museotekBox'
 import { AuthorizationCache } from './cache'
 
 export * from './types'
-export { can } from './can'
+export { can, canManageOrg, managesAnyOrg } from './can'
 export { AuthorizationCache } from './cache'
 export type { AuthorizationFetcher, AuthorizationFetchResult } from './cache'
 

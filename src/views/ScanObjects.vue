@@ -1,196 +1,207 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ScanLine } from 'lucide-vue-next'
+import { Plus, ScanLine } from 'lucide-vue-next'
 import {
   KIND_LABEL,
   SCAN_OBJECT_KINDS,
-  createScanObject,
   listScanObjects,
   resolveScanObjectKind,
   type ScanObjectDto,
+  type ScanObjectTypeDto,
 } from '@/api/museotekBox'
-import { useMutation, useQuery } from '@/lib/useQuery'
+import { useQuery } from '@/lib/useQuery'
+import { useShared } from '@/lib/queries'
 import { useDataList } from '@/lib/useDataList'
 import { useOrgScope } from '@/lib/useOrgScope'
-import {
-  emptyScanObjectForm,
-  scanObjectFormComplete,
-  toScanObjectRequest,
-} from '@/lib/scanObjectForm'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { canManageOrg } from '@/platform/authz'
+import { Alert } from '@/components/ui/alert'
+import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Select, type SelectOption } from '@/components/ui/select'
 import { SearchInput } from '@/components/ui/input'
-import { PageHeader } from '@/components/ui/page-header'
 import { Pagination } from '@/components/ui/pagination'
-import { FormDialog } from '@/components/ui/dialog'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
-import ScanObjectFormFields from '@/components/scan/ScanObjectFormFields.vue'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cardGrid, headBtnGrad, headBtnOutline, pill, pillTone } from '@/components/experience/styles'
+import NewScanObjectDialog from '@/components/scan/NewScanObjectDialog.vue'
+import ListHeader from '@/components/inventory/ListHeader.vue'
+import InventoryCard from '@/components/inventory/InventoryCard.vue'
+import { scanObjectLook } from '@/components/inventory/scanLook'
 
+/**
+ * The organisation's scan objects, drawn like the Experiences screen: the same header, cards and
+ * grid. Everyone sees them; only a manager of the organisation adds, changes or deletes ("View
+ * only" for the rest). Card types have no screen of their own: a manager makes one from the scan
+ * object form ("+ New type…").
+ */
 const router = useRouter()
-const { orgId, orgOptions, showPicker } = useOrgScope()
+const { orgId, orgOptions, orgNames, showPicker, context } = useOrgScope()
 
-const { data, pending, error } = useQuery(
+const canManage = computed(() => canManageOrg(context.value, orgId.value))
+
+const { data, pending, error, refresh } = useQuery(
   () => (orgId.value ? ['scan-objects', orgId.value] : null),
   () => listScanObjects(orgId.value),
 )
+const objects = computed(() => data.value ?? [])
+const cardTypes = useShared('cardTypes', () => orgId.value || null)
+const typeById = computed<Record<number, ScanObjectTypeDto>>(() =>
+  Object.fromEntries((cardTypes.data.value ?? []).map((t) => [t.id, t])),
+)
 
+const subtitle = computed(() => {
+  const org = orgNames.value[orgId.value]
+  const n = objects.value.length
+  return `${org ? org + ' · ' : ''}${n} scan object${n === 1 ? '' : 's'}`
+})
+
+// ── Search, filters, pages ──
 const kindFilter = ref('')
 const typeFilter = ref('')
-
 const kindOptions = computed<SelectOption[]>(() => [
   { value: '', label: 'All kinds' },
   ...SCAN_OBJECT_KINDS.map((kind) => ({ value: kind, label: KIND_LABEL[kind] })),
 ])
-
-/**
- * Types can only be offered as the raw ids present in the data: the backend has no endpoint
- * listing scan object types, so there are no names to show (see docs/BACKEND-GAPS.md).
- */
-const typeOptions = computed<SelectOption[]>(() => {
-  const ids = Array.from(
-    new Set((data.value ?? []).map((o) => o.scanObjectTypeId).filter((id): id is number => id !== null)),
-  ).sort((a, b) => a - b)
-  return [
-    { value: '', label: 'All types' },
-    ...ids.map((id) => ({ value: String(id), label: `Type ${id}` })),
-  ]
-})
-
+const typeOptions = computed<SelectOption[]>(() => [
+  { value: '', label: 'All card types' },
+  { value: 'none', label: 'No card type' },
+  ...[...(cardTypes.data.value ?? [])]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((t) => ({ value: String(t.id), label: t.name })),
+])
 const filters = computed(() => {
   const predicates: ((o: ScanObjectDto) => boolean)[] = []
-  if (kindFilter.value) {
-    predicates.push((o) => resolveScanObjectKind(o.kind) === kindFilter.value)
-  }
-  if (typeFilter.value) {
-    predicates.push((o) => String(o.scanObjectTypeId ?? '') === typeFilter.value)
-  }
+  if (kindFilter.value) predicates.push((o) => resolveScanObjectKind(o.kind) === kindFilter.value)
+  if (typeFilter.value === 'none') predicates.push((o) => o.scanObjectTypeId === null)
+  else if (typeFilter.value) predicates.push((o) => String(o.scanObjectTypeId ?? '') === typeFilter.value)
   return predicates
 })
-
 const list = useDataList<ScanObjectDto>(data, {
   // The tag is worth searching too: finding the object a physical tag belongs to is a real task.
-  searchFields: (o) => [o.name, o.rfidTag],
-  sortValues: {
-    name: (o) => o.name,
-    kind: (o) => kindLabel(o),
-    type: (o) => o.scanObjectTypeId,
-    rfidTag: (o) => o.rfidTag,
-    reusable: (o) => (o.reusable ? 1 : 0),
-  },
+  searchFields: (o) => [o.name, o.rfidTag, o.scanObjectTypeId !== null ? typeById.value[o.scanObjectTypeId]?.name : null],
+  sortValues: { name: (o) => o.name },
   initialSort: { key: 'name', direction: 'asc' },
-  pageSize: 15,
+  pageSize: 12,
   filters,
 })
 
-function kindLabel(object: ScanObjectDto): string {
-  const kind = resolveScanObjectKind(object.kind)
-  // An unmapped kind shows the backend's own value rather than a guess.
-  return kind ? KIND_LABEL[kind] : object.kind || '—'
+/** Back to everything: the search box and both filters emptied. */
+function clearFilters() {
+  list.reset()
+  kindFilter.value = ''
+  typeFilter.value = ''
 }
 
-const columns: DataTableColumn<ScanObjectDto>[] = [
-  { key: 'name', label: 'Name', sortable: true },
-  { key: 'kind', label: 'Kind', sortable: true },
-  { key: 'type', label: 'Type', sortable: true, headClass: 'w-24' },
-  { key: 'rfidTag', label: 'RFID tag', sortable: true },
-  { key: 'reusable', label: 'Reusable', sortable: true, align: 'right', headClass: 'w-28' },
-]
+/** The cards of the page shown, each with how it looks (icon, colour, card type). */
+const cards = computed(() => list.rows.value.map((o) => ({ o, look: scanObjectLook(o, typeById.value) })))
 
-// ── Create ──
+/** The line under a card's name: its kind, and its card type unless that only repeats the name. */
+function cardLine(o: ScanObjectDto, look: ReturnType<typeof scanObjectLook>) {
+  const typeName = look.typeName ?? 'No card type'
+  return typeName.trim().toLowerCase() === o.name.trim().toLowerCase() ? look.kindLabel : `${look.kindLabel} · ${typeName}`
+}
+
+// ── New scan object (the shared dialog); once made, it opens ──
 const createOpen = ref(false)
-const form = ref(emptyScanObjectForm('DRAFT'))
-const create = useMutation(createScanObject, { invalidates: ['scan-objects'] })
-
 function startCreate() {
-  form.value = emptyScanObjectForm('DRAFT')
-  create.reset()
   createOpen.value = true
 }
-
-async function submitCreate() {
-  const outcome = await create.mutate(orgId.value, form.value.kind, toScanObjectRequest(form.value))
-  if (outcome.ok && outcome.data) {
-    createOpen.value = false
-    router.push(`/scan-objects/${orgId.value}/${outcome.data.id}`)
-  }
+function onCreated(o: ScanObjectDto) {
+  router.push(`/scan-objects/${orgId.value}/${o.id}`)
 }
 </script>
 
 <template>
   <div>
-    <PageHeader title="Scan objects">
+    <ListHeader title="Scan objects" :subtitle="orgId ? subtitle : undefined" :view-only="!!orgId && !canManage">
       <template #actions>
-        <Select
-          v-if="showPicker"
-          v-model="orgId"
-          :options="orgOptions"
-          class="w-52"
-          aria-label="Organisation"
-        />
-        <Button variant="gradient" size="sm" :disabled="!orgId" @click="startCreate">New scan object</Button>
+        <Select v-if="showPicker" v-model="orgId" :options="orgOptions" class="w-52" aria-label="Organisation" />
+        <button v-if="canManage" type="button" :class="headBtnGrad" @click="startCreate">
+          <Plus class="h-4 w-4" />New scan object
+        </button>
       </template>
-    </PageHeader>
+    </ListHeader>
 
-    <div class="space-y-6">
-      <div class="flex flex-wrap items-center gap-3">
-        <SearchInput
-          v-model="list.search.value"
-          label="Search scan objects by name or RFID tag"
-          placeholder="Search by name or tag…"
-        />
-        <Select v-model="kindFilter" :options="kindOptions" class="w-44" aria-label="Filter by kind" />
-        <Select v-model="typeFilter" :options="typeOptions" class="w-36" aria-label="Filter by type" />
-      </div>
-
-      <DataTable
-        :columns="columns"
-        :rows="list.rows.value"
-        :row-key="(row) => String(row.id)"
-        :sort-key="list.sortKey.value"
-        :sort-direction="list.sortDirection.value"
-        :loading="pending"
-        :error="error"
-        clickable
-        empty-title="No scan objects"
-        :empty-icon="ScanLine"
-        @sort="list.toggleSort"
-        @row-click="(row) => router.push(`/scan-objects/${orgId}/${row.id}`)"
-      >
-        <template #cell-kind="{ row }">{{ kindLabel(row) }}</template>
-        <template #cell-type="{ row }">
-          <span v-if="row.scanObjectTypeId !== null">{{ row.scanObjectTypeId }}</span>
-          <span v-else class="text-muted-foreground">—</span>
-        </template>
-        <template #cell-rfidTag="{ row }">
-          <span v-if="row.rfidTag" class="font-mono text-xs">{{ row.rfidTag }}</span>
-          <span v-else class="text-muted-foreground">Not tagged</span>
-        </template>
-        <template #cell-reusable="{ row }">
-          <Badge :variant="row.reusable ? 'success' : 'neutral'" dot>
-            {{ row.reusable ? 'Yes' : 'No' }}
-          </Badge>
-        </template>
-      </DataTable>
-
-      <Pagination
-        v-model:page="list.page.value"
-        :page-size="list.pageSize.value"
-        :total="list.total.value"
+    <!-- A search box sized for a name, with the filters beside it; on a phone the search takes the row
+         and the filters share the next. Hidden while there is nothing at all to search. -->
+    <div v-if="objects.length" class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <SearchInput
+        v-model="list.search.value"
+        label="Search scan objects by name, RFID tag or card type"
+        placeholder="Search name, tag or card type…"
+        class="min-w-0 sm:max-w-xs"
       />
-
-      <FormDialog
-        v-model:open="createOpen"
-        title="New scan object"
-        submit-label="Create"
-        :busy="create.loading.value"
-        :error="create.error.value"
-        :submit-disabled="!scanObjectFormComplete(form)"
-        @submit="submitCreate"
-      >
-          <ScanObjectFormFields v-model="form" :field-errors="create.fieldErrors.value" show-rfid />
-      </FormDialog>
+      <div class="grid grid-cols-2 gap-3 sm:flex">
+        <Select v-model="kindFilter" :options="kindOptions" class="w-full sm:w-44" aria-label="Filter by kind" />
+        <Select v-model="typeFilter" :options="typeOptions" class="w-full sm:w-48" aria-label="Filter by card type" />
+      </div>
     </div>
+
+    <Alert v-if="error" variant="error" title="Couldn't load the scan objects">
+      {{ error }}
+      <button type="button" :class="[headBtnOutline, 'mt-3']" @click="refresh()">Try again</button>
+    </Alert>
+
+    <div v-else-if="pending" :class="cardGrid">
+      <div v-for="n in 6" :key="n" class="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+        <Skeleton class="h-16 w-full rounded-none" />
+        <div class="space-y-3 p-4">
+          <Skeleton class="h-4 w-32" />
+          <Skeleton class="h-4 w-20" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Nothing yet: what scan objects are, and the first step for whoever can take it. -->
+    <Card v-else-if="!objects.length">
+      <EmptyState
+        title="No scan objects yet"
+        :description="`Scan objects are the cards and objects visitors place on a Box to start or answer an experience.${canManage ? '' : ' Your organisation manager adds them.'}`"
+        :icon="ScanLine"
+        tone="brand"
+      >
+        <template v-if="canManage" #action>
+          <button type="button" :class="headBtnGrad" @click="startCreate"><Plus class="h-4 w-4" />New scan object</button>
+        </template>
+      </EmptyState>
+    </Card>
+
+    <!-- Some exist, but the search or a filter hides them all. -->
+    <Card v-else-if="!list.rows.value.length">
+      <EmptyState title="Nothing matches" description="Try another search or filter." :icon="ScanLine">
+        <template #action>
+          <button type="button" :class="headBtnOutline" @click="clearFilters">Clear filters</button>
+        </template>
+      </EmptyState>
+    </Card>
+
+    <template v-else>
+      <div :class="cardGrid">
+        <InventoryCard
+          v-for="{ o, look } in cards"
+          :key="o.id"
+          :to="`/scan-objects/${orgId}/${o.id}`"
+          :title="o.name"
+          :subtitle="cardLine(o, look)"
+          :icon="look.icon"
+          :colour="look.colour"
+          :dark-icon="look.darkIcon"
+          compact
+        >
+          <template #pills>
+            <span v-if="o.rfidTag" :class="[pill, pillTone.neutral, 'font-mono']">{{ o.rfidTag }}</span>
+            <span v-else :class="[pill, pillTone.outline]">Not tagged</span>
+            <span v-if="look.type?.exit" :class="[pill, pillTone.warning]">Exit</span>
+            <span v-else-if="look.type?.universal" :class="[pill, pillTone.brand]">Universal</span>
+          </template>
+        </InventoryCard>
+      </div>
+      <!-- Only when there is more than one page: the count is already in the header. -->
+      <Pagination
+        v-if="list.total.value > list.pageSize.value"
+        v-model:page="list.page.value" :page-size="list.pageSize.value" :total="list.total.value" class="mt-5" />
+    </template>
+
+    <NewScanObjectDialog v-if="canManage && orgId" v-model:open="createOpen" :org-id="orgId" @created="onCreated" />
   </div>
 </template>

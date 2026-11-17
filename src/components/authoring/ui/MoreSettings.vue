@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import AIcon from '../AIcon.vue'
 
-/** The rare settings of a page, folded away under one line. */
+/** The rare settings of a page, folded away under one line. `title` names the line (default "More settings"). */
+withDefaults(defineProps<{ title?: string }>(), { title: 'More settings' })
 const open = ref(false)
 </script>
 
@@ -15,7 +16,7 @@ const open = ref(false)
       @click="open = !open"
     >
       <AIcon name="gear" cls="h-5 w-5 text-muted-foreground" />
-      <span class="flex-1">More settings</span>
+      <span class="flex-1">{{ title }}</span>
       <span class="text-muted-foreground transition-transform" :class="open ? '-rotate-90' : 'rotate-90'"><AIcon name="chev" cls="h-5 w-5" /></span>
     </button>
     <div v-if="open" class="space-y-6 border-t border-border px-6 py-6 sm:px-7"><slot /></div>

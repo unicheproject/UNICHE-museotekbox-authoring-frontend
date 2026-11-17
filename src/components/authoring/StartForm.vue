@@ -2,15 +2,13 @@
 import { computed } from 'vue'
 import { hasDisplay, type Authoring } from '@/lib/authoring/engine'
 import MediaField from './ui/MediaField.vue'
-import MoreSettings from './ui/MoreSettings.vue'
 import MoveOnCard from './ui/MoveOnCard.vue'
 import QCard from './ui/QCard.vue'
 import ScanField from './ui/ScanField.vue'
-import Sub from './ui/Sub.vue'
 
 /**
  * The Start's page: the scan that starts the visit, what the visitor sees and hears first, and when
- * they move on to the first activity. A video on the Box's own display is under "More settings".
+ * they move on to the first activity. Each is its own numbered question, so nothing is folded away.
  */
 const props = defineProps<{ a: Authoring }>()
 const emit = defineEmits<{ change: [] }>()
@@ -35,11 +33,8 @@ function set(key: 'startCard' | 'welcomeMedia' | 'welcomeAudio' | 'welcomeBoxVid
   <QCard :n="display ? 3 : 2" title="Does the Box play a sound?" optional>
     <MediaField kind="AUDIO" :model-value="d.welcomeAudio" @update:model-value="set('welcomeAudio', $event)" />
   </QCard>
-  <MoveOnCard :a="a" from-key="start" :n="display ? 4 : 3" @change="emit('change')" />
-  <MoreSettings>
-    <div>
-      <Sub title="Video on the Box" optional />
-      <MediaField kind="VIDEO" :model-value="d.welcomeBoxVideo" @update:model-value="set('welcomeBoxVideo', $event)" />
-    </div>
-  </MoreSettings>
+  <QCard :n="display ? 4 : 3" title="Does the Box play a video?" optional>
+    <MediaField kind="VIDEO" :model-value="d.welcomeBoxVideo" @update:model-value="set('welcomeBoxVideo', $event)" />
+  </QCard>
+  <MoveOnCard :a="a" from-key="start" :n="display ? 5 : 4" @change="emit('change')" />
 </template>

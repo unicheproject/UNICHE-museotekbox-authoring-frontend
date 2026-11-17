@@ -30,10 +30,10 @@ function pick(v: string) {
       <span class="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-muted-foreground"><AIcon name="scan" cls="h-6 w-6" /></span>
       Choose a scan
     </button>
-    <div v-else class="flex items-center gap-4 rounded-md border border-border bg-white p-3">
+    <div v-else class="flex items-center gap-4 rounded-md bg-surface-2 p-3">
       <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-brand-deep"><AIcon name="scan" cls="h-6 w-6" /></span>
       <span class="min-w-0 flex-1 truncate text-[14px] font-bold">{{ name }}</span>
-      <span v-if="!chosen" class="shrink-0 rounded-pill bg-amber-100 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not registered yet</span>
+      <span v-if="!chosen" class="shrink-0 rounded-pill bg-warning/10 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not registered yet</span>
       <button type="button" :class="rowLink" @click="open = true">Change</button>
       <button v-if="optional" type="button" :class="rowRemove" @click="emit('update:modelValue', '')">Remove</button>
     </div>

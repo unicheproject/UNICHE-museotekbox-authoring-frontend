@@ -7,10 +7,15 @@ import { useComments } from '@/lib/authoring/useComments'
 import { Alert } from '@/components/ui/alert'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { deleteProject, describeError } from '@/api/museotekBox'
-import { fetchShared, invalidate } from '@/lib/queries'
+import { invalidate, useShared } from '@/lib/queries'
+import { publishLabel } from '@/lib/publish'
+import { canManageOrg } from '@/platform/authz'
+import { useAuthzStore } from '@/stores/authz'
 import { Skeleton } from '@/components/ui/skeleton'
 import AddActivityDialog from '@/components/authoring/AddActivityDialog.vue'
 import StepFrame from '@/components/authoring/StepFrame.vue'
+import ExperienceHeader from '@/components/authoring/ExperienceHeader.vue'
+import VisitPath from '@/components/authoring/ui/VisitPath.vue'
 import VisitPage from '@/components/authoring/VisitPage.vue'
 import QuizForm from '@/components/authoring/QuizForm.vue'
 import QuestionPage from '@/components/authoring/QuestionPage.vue'
@@ -21,12 +26,15 @@ import SettingsPage from '@/components/authoring/SettingsPage.vue'
 import CommentsPage from '@/components/authoring/CommentsPage.vue'
 import TestRun from '@/components/authoring/TestRun.vue'
 import PublishView from '@/components/authoring/PublishView.vue'
+import GuideBar from '@/components/experience/GuideBar.vue'
+import { guideStepOf } from '@/lib/guide'
 import ScenesRules from '@/components/authoring/ScenesRules.vue'
 
 /**
  * The experience page: the visit as one numbered list, top to bottom — Start, the activities, End —
- * with the hand-over between every two steps. Every step, every question of a quiz, the settings
- * and the comments open on a page of their own; adding an activity opens a dialog.
+ * with the hand-over between every two steps. Every step, the settings and the comments open on a
+ * page of their own; a question or slide of a quiz opens in a panel over the quiz, and adding an
+ * activity opens a dialog.
  *
  * Every screen has an address, so an experience is somewhere you can go back to:
  *   /experiences/<id>                     the visit
@@ -47,6 +55,10 @@ const projectId = computed(() => route.params.projectId as string)
 const { authoring: a, project, loading, error, saveError, pending, renaming, load, commit, rename } = useAuthoring(projectId)
 
 const base = computed(() => `/experiences/${projectId.value}`)
+
+const authz = useAuthzStore()
+/** Renaming and deleting are for managers of its organisation; a curator edits the content only. */
+const canManage = computed(() => !!project.value && canManageOrg(authz.context, project.value.orgId))
 const isIsland = (k: string) => a.islands.some((x) => x.key === k)
 const comments = useComments(projectId)
 
@@ -88,7 +100,9 @@ watch(
   () => route.fullPath,
   async (now, was) => {
     const path = (p: string) => p.split('?')[0]
-    if (!was || path(now) !== path(was)) window.scrollTo(0, 0)
+    // Opening or closing a question's panel keeps the quiz under it where it was.
+    const quiz = (p: string) => path(p).replace(/\/q\/\d+$/, '')
+    if (!was || quiz(now) !== quiz(was)) window.scrollTo(0, 0)
     await focusField()
   },
 )
@@ -156,17 +170,27 @@ async function removeExperience() {
   }
 }
 
-/** Published: it is on at least one of the museum's Boxes. */
-const published = ref(false)
-async function loadPublished() {
-  if (!project.value) return
-  const { orgId, id } = project.value
-  try {
-    published.value = (await fetchShared('installed', orgId)).includes(id)
-  } catch {
-    // Not knowing only means the header says Draft; the Publish page shows the Boxes itself.
-  }
-}
+/**
+ * The latest published version, kept fresh: every save invalidates it, so "changes since" shows
+ * up without a reload. Undefined while unknown (or if it failed to load), null if never published.
+ */
+const publishStatus = useShared('publishStatus', () => project.value?.id)
+const publishState = computed(() => publishLabel(publishStatus.data.value))
+/** Published and nothing saved since. */
+const published = computed(() => publishState.value?.kind === 'published' && !publishState.value.changes)
+
+/**
+ * Reached from the Dashboard's guide (`?guide=2` or `3`): the bar on top. Step 2 (build it) is done
+ * when nothing is left to fix, and leads to Publish; on the Publish page it is step 3, done once a
+ * version is published, and leads back to the Dashboard to add a Box.
+ */
+const guideStep = computed(() => {
+  const g = guideStepOf(route.query)
+  if (g === 3) return 3
+  if (g === 2) return publishing.value ? 3 : 2
+  return null
+})
+const guideDone = computed(() => (guideStep.value === 3 ? !!publishStatus.data.value : fixes.value.length === 0))
 
 /** Whether what is on the page has reached the backend. */
 const saving = computed(() => pending.value || renaming.value)
@@ -180,8 +204,8 @@ function onKey(event: KeyboardEvent) {
 
 onMounted(async () => {
   window.addEventListener('keydown', onKey)
+  void authz.load()
   await load()
-  void loadPublished()
   await focusField()
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
@@ -191,7 +215,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
   <div>
     <Alert v-if="error" variant="error" title="Couldn't load this experience">{{ error }}</Alert>
 
-    <div v-else-if="loading" class="mx-auto max-w-[820px] space-y-6">
+    <div v-else-if="loading" class="space-y-6">
       <div class="space-y-3">
         <Skeleton class="h-4 w-24" />
         <Skeleton class="h-8 w-72" />
@@ -204,8 +228,49 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       </div>
     </div>
 
-    <template v-else>
-      <Alert v-if="saveError" variant="error" class="mx-auto mb-6 max-w-[820px]" dismissible @dismiss="saveError = null">{{ saveError }}</Alert>
+    <!--
+      One frame for every page of the experience: the header and the row of steps are drawn here,
+      once, and only the content under them changes. Every one of these addresses renders this same
+      component, so moving between steps patches the content and leaves the frame where it is.
+    -->
+    <div v-else>
+      <GuideBar
+        v-if="guideStep === 2"
+        :step="2"
+        title="Build your experience"
+        :done="guideDone"
+        next-label="Publish it"
+        :next-to="`${base}/publish?guide=3`"
+      />
+      <GuideBar v-else-if="guideStep === 3" :step="3" title="Publish it" :done="guideDone" next-label="Add a Box" next-to="/?open=box" />
+      <div class="mb-6 rounded-lg bg-white px-5 py-5 shadow-xs sm:px-6">
+        <ExperienceHeader
+          :name="title"
+          :base="base"
+          :publish-state="publishState"
+          :saving="saving"
+          :save-error="!!saveError"
+          :comments="openOf().length"
+          :active="settings ? 'settings' : commentsPage ? 'comments' : publishing ? 'publish' : null"
+          :at-overview="route.name === 'experience' || testing || adding"
+          @comments="router.push(`${base}/comments`)"
+          @settings="router.push(`${base}/settings`)"
+          @test="router.push(`${base}/test`)"
+          @publish="router.push(`${base}/publish`)"
+        />
+        <VisitPath
+          class="-mx-5 -mb-5 mt-5 rounded-b-lg border-t border-border bg-surface-2/60 px-5 py-4 sm:-mx-6 sm:px-6"
+          :a="a"
+          :current="sel"
+          :base="base"
+          :fixes="fixes"
+          :comments="(k) => openOf(k).length"
+          @link="openLink"
+          @add="openAdd"
+        />
+      </div>
+
+      <Alert v-if="saveError && !publishing" variant="error" class="mb-6" dismissible @dismiss="saveError = null">{{ saveError }}</Alert>
 
       <PublishView
         v-if="publishing && project"
@@ -217,7 +282,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :base="base"
         @back="router.push(base)"
         @fix="fix"
-        @published="(on) => (published = on)"
       />
       <ScenesRules
         v-else-if="advanced"
@@ -230,6 +294,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-else-if="settings"
         :a="a"
         :base="base"
+        :can-manage="canManage"
         @change="commit"
         @rename="rename"
         @advanced="router.push(`${base}/advanced`)"
@@ -243,27 +308,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :base="base"
       />
 
-      <QuestionPage
-        v-else-if="question"
-        :key="`${question.isl.key}-${question.n}`"
-        :a="a"
-        :cfg="question.isl.cfg"
-        :step-key="question.isl.key"
-        :index="question.n"
-        :name="title"
-        :base="base"
-        :saving="saving"
-        :fixes="fixes"
-        @change="commit"
-      />
-
       <StepFrame
         v-else-if="sel === 'start'"
         :a="a"
         step-key="start"
-        :name="title"
         :base="base"
-        :saving="saving"
         :fixes="fixes"
         :comments="openOf('start')"
         @comments="router.push(`${base}/comments/start`)"
@@ -276,9 +325,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :key="selIsland.isl.key"
         :a="a"
         :step-key="selIsland.isl.key"
-        :name="title"
         :base="base"
-        :saving="saving"
         :fixes="fixes"
         movable
         :comments="openOf(selIsland.isl.key)"
@@ -311,9 +358,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-else-if="sel === 'end'"
         :a="a"
         step-key="end"
-        :name="title"
         :base="base"
-        :saving="saving"
         :fixes="fixes"
         :comments="openOf('end')"
         @comments="router.push(`${base}/comments/end`)"
@@ -324,21 +369,26 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <VisitPage
         v-else
         :a="a"
-        :name="title"
         :published="published"
-        :saving="saving"
-        :save-error="!!saveError"
         :fixes="fixes"
-        :comments="(k) => openOf(k).length"
         @step="openStep"
         @link="openLink"
-        @add="openAdd"
-        @comments="router.push(`${base}/comments`)"
-        @settings="router.push(`${base}/settings`)"
-        @test="router.push(`${base}/test`)"
-        @publish="router.push(`${base}/publish`)"
       />
 
+      <!-- A question or slide opens in a panel over its quiz, so the list stays in view. -->
+      <QuestionPage
+        v-if="question"
+        :key="`${question.isl.key}-${question.n}`"
+        :a="a"
+        :cfg="question.isl.cfg"
+        :step-key="question.isl.key"
+        :index="question.n"
+        :name="title"
+        :base="base"
+        :saving="saving"
+        :fixes="fixes"
+        @change="commit"
+      />
       <TestRun v-if="testing" :a="a" :comments="comments" @close="router.push(base)" />
       <AddActivityDialog
         v-if="adding"
@@ -365,6 +415,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :error="deleteError"
         @confirm="removeExperience"
       />
-    </template>
+    </div>
   </div>
 </template>

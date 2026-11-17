@@ -7,7 +7,6 @@ import { stepGlyph, stepKeys, stepTitle, stepTone } from '@/lib/authoring/tone'
 import { sceneName, type Comments } from '@/lib/authoring/useComments'
 import AIcon from './AIcon.vue'
 import CommentThread from './CommentThread.vue'
-import Crumbs from './ui/Crumbs.vue'
 import { btnDeep } from './ui/styles'
 
 /**
@@ -53,15 +52,8 @@ const more = (k: string) => (shown.value[`${tab.value}:${k}`] = count(k) + PAGE)
 </script>
 
 <template>
-  <div class="mx-auto max-w-[760px] min-[1700px]:max-w-[1100px]">
-    <Crumbs
-      :parts="
-        step
-          ? [{ text: 'Experiences', to: '/experiences' }, { text: a.details.name || 'Untitled experience', to: base }, { text: stepTitle(a, step), to: `${base}/step/${step}` }, { text: 'Comments' }]
-          : [{ text: 'Experiences', to: '/experiences' }, { text: a.details.name || 'Untitled experience', to: base }, { text: 'Comments' }]
-      "
-    />
-    <h1 class="text-2xl font-extrabold tracking-tight">Comments</h1>
+  <div>
+    <h2 class="text-xl font-extrabold tracking-tight">Comments<template v-if="step"> on {{ stepTitle(a, step) }}</template></h2>
     <p class="mb-5 mt-0.5 text-[13px] text-muted-foreground">Left by people trying the experience, on the screen they were looking at.</p>
 
     <div class="mb-3 flex flex-wrap items-center gap-2.5">

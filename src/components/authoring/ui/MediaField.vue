@@ -40,7 +40,7 @@ function pick(v: string) {
       </span>
       Choose {{ word }}
     </button>
-    <div v-else class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border bg-white p-2.5 sm:flex-nowrap sm:gap-4 sm:p-3">
+    <div v-else class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-surface-2 p-2.5 sm:flex-nowrap sm:gap-4 sm:p-3">
       <span class="relative flex h-11 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-2 text-brand-deep sm:h-14 sm:w-24 sm:rounded-lg">
         <template v-if="src">
           <video v-if="chosen?.kind === 'VIDEO'" :src="`${src}#t=0.1`" muted playsinline preload="metadata" class="h-full w-full object-cover" />
@@ -52,7 +52,7 @@ function pick(v: string) {
         <AIcon v-else :name="icon" cls="h-6 w-6" />
       </span>
       <span class="min-w-[110px] flex-1 truncate text-[13px] font-semibold sm:min-w-0 sm:text-[14px]">{{ chosen?.name ?? modelValue }}</span>
-      <span v-if="!chosen" class="shrink-0 rounded-pill bg-amber-100 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not uploaded yet</span>
+      <span v-if="!chosen" class="shrink-0 rounded-pill bg-warning/10 px-2.5 py-0.5 text-[12px] font-bold text-warning">Not uploaded yet</span>
       <span class="ml-auto flex shrink-0">
         <button type="button" :class="rowLink" @click="open = true">Change</button>
         <button v-if="!bare" type="button" :class="rowRemove" @click="emit('update:modelValue', '')">Remove</button>
