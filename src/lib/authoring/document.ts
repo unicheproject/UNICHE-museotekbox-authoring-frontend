@@ -129,8 +129,7 @@ function toTrigger(t: Trigger): TriggerDto {
   return { type: t.type }
 }
 
-function toCondition(c: Condition | null): ConditionDto | null {
-  if (!c) return null
+function toCondition(c: Condition): ConditionDto {
   if (c.type === 'VAR_CMP') return { type: 'VAR_CMP', variable: c.var, op: c.op as ConditionOp, value: String(c.value) }
   return { type: 'FLAG_IS', variable: c.var, value: String(c.value) }
 }
@@ -252,7 +251,8 @@ export function toWriteRequest(a: Authoring, base: ExperienceDto): ExperienceWri
       ruleKey: keys.ruleKey(),
       position: i,
       trigger: toTrigger(r.trigger),
-      condition: toCondition(r.condition),
+      // The engine keeps at most one condition per rule; the backend takes a list (all must hold).
+      conditions: r.condition ? [toCondition(r.condition)] : [],
       effects: r.effects.map(toEffect),
       destination: toDestination(r.destination, sceneKeyOf),
     }))

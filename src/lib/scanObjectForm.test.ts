@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   emptyScanObjectForm,
   scanObjectFormComplete,
+  scanObjectFormErrors,
   scanObjectToForm,
   toScanObjectRequest,
 } from './scanObjectForm'
@@ -43,15 +44,20 @@ describe('toScanObjectRequest', () => {
     expect(body).not.toHaveProperty('imageUrl')
   })
 
-  it('turns blank text into null rather than an empty string', () => {
-    const form = { ...emptyScanObjectForm('PRINTED_IMAGE'), name: ' Poster ', rfidTag: '   ', imageUrl: '' }
+  it('trims text and sends a blank RFID tag or type as null, never an empty string', () => {
+    const form = { ...emptyScanObjectForm('PRINTED_IMAGE'), name: ' Poster ', rfidTag: '   ', imageUrl: ' a.png ' }
     expect(toScanObjectRequest(form)).toEqual({
       name: 'Poster',
       rfidTag: null,
       reusable: false,
       scanObjectTypeId: null,
-      imageUrl: null,
+      imageUrl: 'a.png',
     })
+  })
+
+  it('sends back the stored reusable value it does not show', () => {
+    const form = { ...emptyScanObjectForm('DRAFT'), name: 'X', reusable: true }
+    expect(toScanObjectRequest(form).reusable).toBe(true)
   })
 
   it('treats a non-numeric type id as absent instead of sending NaN', () => {
@@ -110,5 +116,32 @@ describe('scanObjectFormComplete', () => {
     expect(scanObjectFormComplete(emptyScanObjectForm())).toBe(false)
     expect(scanObjectFormComplete({ ...emptyScanObjectForm(), name: '  ' })).toBe(false)
     expect(scanObjectFormComplete({ ...emptyScanObjectForm(), name: 'Ok' })).toBe(true)
+  })
+
+  it('requires the image reference for a printed image and the model reference for a 3D object', () => {
+    expect(scanObjectFormComplete({ ...emptyScanObjectForm('PRINTED_IMAGE'), name: 'P', imageUrl: ' ' })).toBe(false)
+    expect(scanObjectFormComplete({ ...emptyScanObjectForm('PRINTED_IMAGE'), name: 'P', imageUrl: 'a.png' })).toBe(true)
+    expect(scanObjectFormComplete({ ...emptyScanObjectForm('THREE_D_PRINTED_OBJECT'), name: 'V' })).toBe(false)
+    expect(scanObjectFormComplete({ ...emptyScanObjectForm('THREE_D_PRINTED_OBJECT'), name: 'V', modelRef: 'v.glb' })).toBe(true)
+  })
+
+  it('ignores the reference fields of other kinds', () => {
+    expect(scanObjectFormComplete({ ...emptyScanObjectForm('DRAFT'), name: 'D', imageUrl: '', modelRef: '' })).toBe(true)
+  })
+})
+
+describe('scanObjectFormErrors', () => {
+  it('names the field that is missing', () => {
+    expect(scanObjectFormErrors({ ...emptyScanObjectForm('PRINTED_IMAGE') })).toEqual({
+      name: 'Give it a name',
+      imageUrl: 'A printed image needs its image reference',
+    })
+  })
+
+  it('enforces the 255-character limit, RFID tag included', () => {
+    const long = 'x'.repeat(256)
+    const errors = scanObjectFormErrors({ ...emptyScanObjectForm('THREE_D_PRINTED_OBJECT'), name: long, modelRef: long, rfidTag: long })
+    expect(errors).toEqual({ name: 'At most 255 characters', modelRef: 'At most 255 characters', rfidTag: 'At most 255 characters' })
+    expect(scanObjectFormErrors({ ...emptyScanObjectForm('DRAFT'), name: 'x'.repeat(255) })).toEqual({})
   })
 })
