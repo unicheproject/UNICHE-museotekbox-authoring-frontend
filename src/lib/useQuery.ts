@@ -1,5 +1,9 @@
 import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
+import { knownError } from './errorMessages'
 import { parseError } from './fieldErrors'
+
+/** The top line of a form whose problem is shown under one of its fields. */
+const FIELD_HINT = 'Please correct the highlighted fields.'
 
 /**
  * Minimal server-state layer: a keyed cache with shared reactive state, in-flight de-duplication
@@ -266,8 +270,11 @@ export function useMutation<Args extends unknown[], R>(
       return { ok: true, data }
     } catch (e) {
       const parsed = parseError(e)
-      error.value = options.describe?.(e) ?? parsed.message
-      fieldErrors.value = parsed.fields
+      const known = knownError(e)
+      // A known code that belongs to one field goes under that field; the top line then says so.
+      error.value =
+        options.describe?.(e) ?? (known ? (known.field ? FIELD_HINT : known.message) : parsed.message)
+      fieldErrors.value = known?.field ? { ...parsed.fields, [known.field]: known.message } : parsed.fields
       return { ok: false }
     } finally {
       loading.value = false
