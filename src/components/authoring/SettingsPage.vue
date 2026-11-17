@@ -12,7 +12,15 @@ import Sub from './ui/Sub.vue'
 import { bigInput, btnDeep, btnOutline } from './ui/styles'
 
 /** The whole experience on a page: its name, and the replies every activity uses. Where it plays, the scenes and deleting it are under "More settings". */
-const props = defineProps<{ a: Authoring; base: string }>()
+const props = defineProps<{
+  a: Authoring
+  base: string
+  /**
+   * The user manages the experience's organisation: only they can rename or delete it (the
+   * Catalogue refuses anyone else). Others see the name read-only and no delete.
+   */
+  canManage: boolean
+}>()
 const emit = defineEmits<{ change: []; rename: [name: string]; advanced: []; delete: [] }>()
 
 const router = useRouter()
@@ -35,7 +43,14 @@ function set(kind: ReplyKind, key: 'text' | 'color' | 'media' | 'audio' | 'boxVi
     <h2 class="mb-5 text-xl font-extrabold tracking-tight">Settings</h2>
     <div class="space-y-5">
       <QCard :n="1" title="Name" :miss="!a.details.name.trim()">
-        <input :value="a.details.name" aria-label="Name" :class="bigInput" @input="emit('rename', ($event.target as HTMLInputElement).value)" />
+        <input
+          :value="a.details.name"
+          aria-label="Name"
+          :readonly="!canManage"
+          :class="[bigInput, !canManage && 'cursor-default bg-surface-2 text-secondary-foreground focus:border-input focus:ring-0']"
+          @input="emit('rename', ($event.target as HTMLInputElement).value)"
+        />
+        <p v-if="!canManage" class="mt-2 text-[13px] text-muted-foreground">Only an organisation manager can rename this experience.</p>
       </QCard>
 
       <QCard v-for="(k, n) in REPLY_KINDS" :key="k.key" :n="n + 2" :title="TITLES[k.key]">
@@ -78,7 +93,12 @@ function set(kind: ReplyKind, key: 'text' | 'color' | 'media' | 'audio' | 'boxVi
         </div>
         <div class="flex flex-wrap gap-2.5">
           <button type="button" :class="[btnOutline, '!py-2.5 !text-[13px]']" @click="emit('advanced')">Scenes and rules</button>
-          <button type="button" :class="[btnOutline, '!py-2.5 !text-[13px] hover:!border-destructive hover:!text-destructive']" @click="emit('delete')">
+          <button
+            v-if="canManage"
+            type="button"
+            :class="[btnOutline, '!py-2.5 !text-[13px] hover:!border-destructive hover:!text-destructive']"
+            @click="emit('delete')"
+          >
             <AIcon name="trash" />Delete this experience
           </button>
         </div>

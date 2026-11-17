@@ -7,7 +7,10 @@ import { useComments } from '@/lib/authoring/useComments'
 import { Alert } from '@/components/ui/alert'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { deleteProject, describeError } from '@/api/museotekBox'
-import { fetchShared, invalidate } from '@/lib/queries'
+import { invalidate, useShared } from '@/lib/queries'
+import { publishLabel } from '@/lib/publish'
+import { canManageOrg } from '@/platform/authz'
+import { useAuthzStore } from '@/stores/authz'
 import { Skeleton } from '@/components/ui/skeleton'
 import AddActivityDialog from '@/components/authoring/AddActivityDialog.vue'
 import StepFrame from '@/components/authoring/StepFrame.vue'
@@ -23,6 +26,8 @@ import SettingsPage from '@/components/authoring/SettingsPage.vue'
 import CommentsPage from '@/components/authoring/CommentsPage.vue'
 import TestRun from '@/components/authoring/TestRun.vue'
 import PublishView from '@/components/authoring/PublishView.vue'
+import GuideBar from '@/components/experience/GuideBar.vue'
+import { guideStepOf } from '@/lib/guide'
 import ScenesRules from '@/components/authoring/ScenesRules.vue'
 
 /**
@@ -50,6 +55,10 @@ const projectId = computed(() => route.params.projectId as string)
 const { authoring: a, project, loading, error, saveError, pending, renaming, load, commit, rename } = useAuthoring(projectId)
 
 const base = computed(() => `/experiences/${projectId.value}`)
+
+const authz = useAuthzStore()
+/** Renaming and deleting are for managers of its organisation; a curator edits the content only. */
+const canManage = computed(() => !!project.value && canManageOrg(authz.context, project.value.orgId))
 const isIsland = (k: string) => a.islands.some((x) => x.key === k)
 const comments = useComments(projectId)
 
@@ -161,17 +170,27 @@ async function removeExperience() {
   }
 }
 
-/** Published: it is on at least one of the museum's Boxes. */
-const published = ref(false)
-async function loadPublished() {
-  if (!project.value) return
-  const { orgId, id } = project.value
-  try {
-    published.value = (await fetchShared('installed', orgId)).includes(id)
-  } catch {
-    // Not knowing only means the header says Draft; the Publish page shows the Boxes itself.
-  }
-}
+/**
+ * The latest published version, kept fresh: every save invalidates it, so "changes since" shows
+ * up without a reload. Undefined while unknown (or if it failed to load), null if never published.
+ */
+const publishStatus = useShared('publishStatus', () => project.value?.id)
+const publishState = computed(() => publishLabel(publishStatus.data.value))
+/** Published and nothing saved since. */
+const published = computed(() => publishState.value?.kind === 'published' && !publishState.value.changes)
+
+/**
+ * Reached from the Dashboard's guide (`?guide=2` or `3`): the bar on top. Step 2 (build it) is done
+ * when nothing is left to fix, and leads to Publish; on the Publish page it is step 3, done once a
+ * version is published, and leads back to the Dashboard to add a Box.
+ */
+const guideStep = computed(() => {
+  const g = guideStepOf(route.query)
+  if (g === 3) return 3
+  if (g === 2) return publishing.value ? 3 : 2
+  return null
+})
+const guideDone = computed(() => (guideStep.value === 3 ? !!publishStatus.data.value : fixes.value.length === 0))
 
 /** Whether what is on the page has reached the backend. */
 const saving = computed(() => pending.value || renaming.value)
@@ -185,8 +204,8 @@ function onKey(event: KeyboardEvent) {
 
 onMounted(async () => {
   window.addEventListener('keydown', onKey)
+  void authz.load()
   await load()
-  void loadPublished()
   await focusField()
 })
 onUnmounted(() => window.removeEventListener('keydown', onKey))
@@ -215,11 +234,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       component, so moving between steps patches the content and leaves the frame where it is.
     -->
     <div v-else>
+      <GuideBar
+        v-if="guideStep === 2"
+        :step="2"
+        title="Build your experience"
+        :done="guideDone"
+        next-label="Publish it"
+        :next-to="`${base}/publish?guide=3`"
+      />
+      <GuideBar v-else-if="guideStep === 3" :step="3" title="Publish it" :done="guideDone" next-label="Add a Box" next-to="/?open=box" />
       <div class="mb-6 rounded-lg bg-white px-5 py-5 shadow-xs sm:px-6">
         <ExperienceHeader
           :name="title"
           :base="base"
-          :published="published"
+          :publish-state="publishState"
           :saving="saving"
           :save-error="!!saveError"
           :comments="openOf().length"
@@ -254,7 +282,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         :base="base"
         @back="router.push(base)"
         @fix="fix"
-        @published="(on) => (published = on)"
       />
       <ScenesRules
         v-else-if="advanced"
@@ -267,6 +294,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-else-if="settings"
         :a="a"
         :base="base"
+        :can-manage="canManage"
         @change="commit"
         @rename="rename"
         @advanced="router.push(`${base}/advanced`)"

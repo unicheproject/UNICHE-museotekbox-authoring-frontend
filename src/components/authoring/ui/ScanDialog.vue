@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import type { ScanType } from '@/lib/authoring/engine'
+import { managesAnyOrg } from '@/platform/authz'
+import { useAuthzStore } from '@/stores/authz'
 import AIcon from '../AIcon.vue'
 import { bigInput, btnDeep, btnOutline, dialogBody, dialogBox, dialogClose, dialogHead, dialogTitle, overlay } from './styles'
 
 /**
  * Every scan the museum has, as tiles, and at the end a way to name one of your own — an experience
  * gets written before the objects are printed, so the author is not held to the list.
+ * With no scan objects at all (a new organisation), it first says where they come from: a name of
+ * your own is not a real card, and nothing can be published without one to start the visit.
  */
 const props = defineProps<{ types: ScanType[]; modelValue: string }>()
 const emit = defineEmits<{ pick: [value: string]; close: [] }>()
+
+/** Whether to offer the way to Scan objects (UX gating only; the backend decides). */
+const { context } = storeToRefs(useAuthzStore())
+const canAdd = computed(() => managesAnyOrg(context.value))
 
 const adding = ref(false)
 const typed = ref('')
@@ -49,6 +59,18 @@ onUnmounted(() => window.removeEventListener('keydown', onKey, true))
           </button>
         </div>
         <div :class="[dialogBody, 'grid content-start gap-2.5 sm:grid-cols-2']">
+          <!-- None registered yet: where they come from, before anything else. -->
+          <div v-if="!types.length" class="flex flex-col items-center px-4 pb-4 pt-2 text-center sm:col-span-2">
+            <span class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-deep/[.07] text-brand-deep" aria-hidden="true">
+              <AIcon name="scan" cls="h-5 w-5" />
+            </span>
+            <p class="text-sm font-bold">No scan objects yet</p>
+            <p class="mt-1.5 max-w-md text-[13.5px] leading-relaxed text-muted-foreground">
+              A visit starts when a visitor places a scan object on the Box.
+              {{ canAdd ? 'Add one first.' : 'Ask your organisation manager to add scan objects.' }}
+            </p>
+            <RouterLink v-if="canAdd" to="/scan-objects" :class="[btnDeep, 'mt-4']" @click="emit('close')">Go to Scan objects</RouterLink>
+          </div>
           <button
             v-for="t in types"
             :key="t.id"
