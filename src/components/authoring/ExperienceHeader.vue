@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import type { PublishLabel } from '@/lib/publish'
+import ExperienceBadges from '@/components/experience/ExperienceBadges.vue'
+import { outlineOn } from '@/components/experience/styles'
 import AIcon from './AIcon.vue'
 import SaveState from './ui/SaveState.vue'
 import { btnGrad, btnOutline } from './ui/styles'
 
 /**
  * The top of every page of an experience, drawn once by the experience page and never by the pages
- * under it: where you are (Experiences › its name), its name, Draft or Published with Saving…/Saved,
+ * under it: where you are (Experiences › its name), its name, Draft / Published vN (· changes) with
+ * Saving…/Saved,
  * and the four actions. Only the content under it changes as the author moves between steps, so
  * nothing here moves or resizes. `active` marks the action whose page is open.
  */
 defineProps<{
   name: string
   base: string
-  published: boolean
+  /** Draft, or the latest published version and whether it was saved since; null while unknown. */
+  publishState: PublishLabel | null
   saving: boolean
   saveError: boolean
   /** Open comments on the whole experience. */
@@ -26,7 +31,7 @@ defineProps<{
 const emit = defineEmits<{ comments: []; settings: []; test: []; publish: [] }>()
 const router = useRouter()
 
-const on = 'border-brand-deep text-brand-deep bg-brand-deep/[.04]'
+const on = outlineOn
 </script>
 
 <template>
@@ -46,10 +51,8 @@ const on = 'border-brand-deep text-brand-deep bg-brand-deep/[.04]'
       <div class="min-w-0">
         <h1 class="truncate text-2xl font-bold leading-tight tracking-tight">{{ name }}</h1>
         <div class="mt-1 flex items-center gap-2 text-[13.5px] text-muted-foreground">
-          <span v-if="published" class="font-bold text-success">Published</span>
-          <span v-else class="font-bold text-secondary-foreground">Draft</span>
+          <ExperienceBadges v-if="publishState" :publish="publishState" />
           <template v-if="!saveError">
-            <span aria-hidden="true">·</span>
             <SaveState :saving="saving" />
           </template>
         </div>

@@ -1,21 +1,26 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { AlertTriangle, ArrowRight, Film, MessageCircle, Volume2 } from 'lucide-vue-next'
+import { ArrowRight, Film, MessageCircle, Volume2 } from 'lucide-vue-next'
 import type { ProjectDto } from '@/api/museotekBox'
+import type { PublishLabel } from '@/lib/publish'
 import { OUTPUTS, template, type ScanType } from '@/lib/authoring/engine'
 import { mediaUrlIn } from '@/lib/authoring/media'
 import { summarize } from '@/lib/authoring/useAuthoring'
 import { relTime } from '@/lib/authoring/useComments'
 import { useShared } from '@/lib/queries'
 import { useVisible } from '@/lib/useVisible'
+import { cardBox, cardOpen, coverFallback } from './styles'
 import AIcon from '@/components/authoring/AIcon.vue'
+import ExperienceBadges from './ExperienceBadges.vue'
 
 /**
  * One experience in the list: its first picture, its name, when it was last edited, the kinds of
- * activity in it, open comments, where it plays, and whether it is published or what is left to do.
+ * activity in it, open comments, where it plays, how many Boxes it is on and what is left to do.
+ * Whether it has been published shows when the screen passes `publish` (the Dashboard does for its
+ * few cards; the full list does not yet, as it would be one call per card).
  *
- * What the whole list knows (comments, Published, scan types) comes in as props, loaded once per
+ * What the whole list knows (comments, Boxes, scan types) comes in as props, loaded once per
  * organisation by the page. Only the experience itself (and its picture) is read here — once the
  * card is near the screen, through the shared cache, so coming back to the list or opening the
  * experience does not read it again. If that fails the card says less and still opens it.
@@ -24,8 +29,10 @@ const props = defineProps<{
   project: ProjectDto
   /** Open comment threads. */
   comments: number
-  /** On at least one Box; null while not known. */
-  published: boolean | null
+  /** How many Boxes it is installed on; null while not known. */
+  boxes: number | null
+  /** Draft / Published vN, where the screen has it (one call per card, so not every screen does). */
+  publish?: PublishLabel | null
   /** The organisation's scan types, to count what is missing; null until they are known. */
   scanTypes: ScanType[] | null
 }>()
@@ -40,23 +47,18 @@ const output = computed(() => (summary.value ? OUTPUTS[summary.value.output] : n
 const activities = computed(() => summary.value?.templates.length ?? 0)
 /** Each kind of activity once, in the order it first appears: nine activities are not nine icons. */
 const kinds = computed(() => Array.from(new Set(summary.value?.templates ?? [])))
-/** A catalogue status other than the usual one is shown as it is, so it is never hidden. */
-const unusual = computed(() => {
-  const s = props.project.status
-  return s && s.toUpperCase() !== 'ACTIVE' ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : null
-})
 </script>
 
 <template>
   <RouterLink
     ref="root"
     :to="`/experiences/${project.id}`"
-    class="group flex flex-col overflow-hidden rounded-lg border border-border bg-white shadow-xs transition-all hover:-translate-y-0.5 hover:border-brand-deep/35 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    :class="['group flex flex-col overflow-hidden', cardBox]"
   >
     <!-- The picture fills the whole width of the card at 16:9, so its height follows the width. -->
     <span
       class="relative block aspect-video overflow-hidden"
-      :class="picture ? 'bg-surface-2' : 'bg-gradient-to-br from-brand-deep to-[#7b3fb8]'"
+      :class="picture ? 'bg-surface-2' : coverFallback"
     >
       <img v-if="picture" :src="picture" alt="" class="h-full w-full object-cover" />
       <!-- The kinds of activity in it, on the picture's corner. -->
@@ -94,30 +96,8 @@ const unusual = computed(() => {
 
       <span class="flex-1" />
       <span class="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
-        <span class="flex flex-wrap items-center gap-2">
-          <span v-if="unusual" class="inline-flex items-center gap-1.5 rounded-pill bg-red-50 px-2.5 py-0.5 text-[12px] font-bold text-destructive">
-            {{ unusual }}
-          </span>
-          <span
-            v-else-if="published"
-            class="inline-flex items-center gap-1.5 rounded-pill bg-emerald-50 px-2.5 py-0.5 text-[12px] font-bold text-success"
-          >
-            <span class="h-1.5 w-1.5 rounded-full bg-success" />Published
-          </span>
-          <span
-            v-else-if="published === false"
-            class="inline-flex items-center gap-1.5 rounded-pill border border-border bg-white px-2.5 py-0.5 text-[12px] font-bold text-secondary-foreground"
-          >
-            <span class="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />Draft
-          </span>
-          <span
-            v-if="summary?.missing"
-            class="inline-flex items-center gap-1 rounded-pill bg-warning/[.06] px-2 py-0.5 text-[12px] font-bold text-warning ring-1 ring-warning/25"
-          >
-            <AlertTriangle class="h-3 w-3" />{{ summary.missing }} missing
-          </span>
-        </span>
-        <span class="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-brand-deep">
+        <ExperienceBadges :publish="publish" :boxes="boxes" :missing="summary?.missing" :status="project.status" />
+        <span :class="cardOpen">
           Open<ArrowRight class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </span>
       </span>

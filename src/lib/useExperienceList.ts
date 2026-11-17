@@ -1,9 +1,7 @@
 import { computed, effectScope, onScopeDispose, shallowReactive, watch, type EffectScope, type Ref } from 'vue'
 import type { ProjectDto } from '@/api/museotekBox'
+import { onlyExperiences } from './experiences'
 import { useShared } from './queries'
-
-/** The tool this frontend authors for; an organisation's projects include other tools' too. */
-const TOOL_SLUG = 'museotekbox'
 
 type OrgQueries = {
   projects: ReturnType<typeof useShared<'projects'>>
@@ -56,10 +54,9 @@ export function useExperienceList(orgIds: Ref<string[]>) {
 
   /** This tool's experiences, most recently changed first. */
   const experiences = computed<ProjectDto[]>(() =>
-    [...orgs.values()]
-      .flatMap((o) => o.projects.data.value ?? [])
-      .filter((p) => p.toolSlug === TOOL_SLUG)
-      .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')),
+    onlyExperiences([...orgs.values()].flatMap((o) => o.projects.data.value ?? [])).sort((a, b) =>
+      (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''),
+    ),
   )
   /** Nothing to show yet: some organisation's projects are still on their first load. */
   const pending = computed(() => [...orgs.values()].some((o) => o.projects.pending.value))
@@ -68,13 +65,35 @@ export function useExperienceList(orgIds: Ref<string[]>) {
   /** What a card needs besides its own experience; null where it is not known (yet). */
   function factsOf(p: ProjectDto) {
     const o = orgs.get(p.orgId)
-    const installed = o?.installed.data.value
+    const usage = o?.installed.data.value
     return {
       comments: o?.commentCounts.data.value?.[p.id] ?? 0,
-      published: installed ? installed.includes(p.id) : null,
+      /** How many Boxes it is on; null while not known. */
+      boxes: usage ? (usage.boxesOf[p.id] ?? 0) : null,
       scanTypes: o?.scanTypes.data.value ?? null,
     }
   }
 
-  return { experiences, pending, error, factsOf }
+  /** Open comment threads across all the experiences listed. */
+  const openComments = computed(() => experiences.value.reduce((n, p) => n + factsOf(p).comments, 0))
+
+  /**
+   * Boxes with nothing installed, across the given organisations; null while any is not known (or
+   * could not be read). Pass only organisations the user manages: for anyone else the Box lists
+   * are filtered to their own experiences, so "nothing installed" would not be true.
+   */
+  function idleBoxes(orgIds: string[]): number | null {
+    let total = 0
+    for (const id of orgIds) {
+      const usage = orgs.get(id)?.installed.data.value
+      if (!usage) return null
+      total += usage.idle
+    }
+    return total
+  }
+
+  /** Read every organisation's projects again (the "Try again" of a failed load). */
+  const refresh = () => Promise.all([...orgs.values()].map((o) => o.projects.refresh()))
+
+  return { experiences, pending, error, refresh, factsOf, openComments, idleBoxes }
 }

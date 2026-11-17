@@ -117,6 +117,8 @@ export function useAuthoring(projectId: Ref<string>) {
       base = await saveExperience(base.projectId, base.version, toWriteRequest(authoring, base))
       // The list's card for it now shows what was just saved, without asking again.
       storeExperience(base)
+      // The draft now differs from what was published: the header and Publish page ask again.
+      invalidate.publishStatus()
       saveError.value = null
     } catch (e) {
       if (e instanceof StaleExperienceError) {

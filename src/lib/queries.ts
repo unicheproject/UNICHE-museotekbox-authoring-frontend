@@ -1,5 +1,6 @@
 import {
   getExperience,
+  getPublishStatus,
   listBoxProjects,
   listBoxes,
   listCommentCounts,
@@ -13,7 +14,9 @@ import {
   type MediaDto,
   type MemberDto,
   type ProjectDto,
+  type PublishStatusDto,
   type ScanObjectDto,
+  type ScanObjectTypeDto,
 } from '@/api/museotekBox'
 import { scanTypesFrom } from '@/lib/authoring/document'
 import type { ScanType } from '@/lib/authoring/engine'
@@ -30,7 +33,9 @@ export const keys = {
   projects: (orgId: string) => ['projects', orgId] as const,
   experience: (projectId: string) => ['experience', projectId] as const,
   scanTypes: (orgId: string) => ['scan-types', orgId] as const,
-  /** The ids of the experiences on at least one of the organisation's Boxes. */
+  /** The card types as the backend returns them (with the Universal/Exit flags), for the Scan objects screens. */
+  cardTypes: (orgId: string) => ['card-types', orgId] as const,
+  /** Which experiences are on the organisation's Boxes, and how many Boxes play nothing. */
   installed: (orgId: string) => ['installed', orgId] as const,
   commentCounts: (orgId: string) => ['comment-counts', orgId] as const,
   /** The same keys the Boxes, Scan objects and Members screens subscribe to. */
@@ -39,6 +44,8 @@ export const keys = {
   scanObjects: (orgId: string) => ['scan-objects', orgId] as const,
   members: (orgId: string) => ['members', orgId] as const,
   media: (orgId: string) => ['media', orgId] as const,
+  /** The latest published version of an experience; null when never published. */
+  publishStatus: (projectId: string) => ['publish-status', projectId] as const,
 }
 
 export const fetchers = {
@@ -48,18 +55,42 @@ export const fetchers = {
   media: (orgId: string): Promise<MediaDto[]> => listMedia(orgId),
   projects: (orgId: string): Promise<ProjectDto[]> => listProjects(orgId),
   experience: (projectId: string): Promise<ExperienceDto> => getExperience(projectId),
+  publishStatus: (projectId: string): Promise<PublishStatusDto | null> => getPublishStatus(projectId),
   scanTypes: async (orgId: string): Promise<ScanType[]> => scanTypesFrom(await listScanObjectTypes(orgId)),
+  cardTypes: (orgId: string): Promise<ScanObjectTypeDto[]> => listScanObjectTypes(orgId),
   // Built from the boxes and each box's experiences, through their own keys, so the Publish page
   // and this share every request.
-  installed: async (orgId: string): Promise<string[]> => {
+  installed: async (orgId: string): Promise<BoxUsage> => {
     const boxes = await fetchQuery(keys.boxes(orgId), () => listBoxes(orgId))
     const lists = await Promise.all(
       boxes.map((b) => fetchQuery(keys.boxProjects(orgId, b.id), () => listBoxProjects(orgId, b.id))),
     )
-    return Array.from(new Set(lists.flat().map((p) => p.id)))
+    return boxUsageFrom(lists.map((list) => list.map((p) => p.id)), boxes.map((b) => b.id))
   },
   commentCounts: async (orgId: string): Promise<Record<string, number>> =>
     Object.fromEntries((await listCommentCounts(orgId)).map((c) => [c.projectId, c.open])),
+}
+
+/** The organisation's Boxes as the experience screens need them. */
+export interface BoxUsage {
+  /** How many Boxes each experience is on, by project id; absent = none. */
+  boxesOf: Record<string, number>
+  /** Boxes with nothing installed. */
+  idle: number
+  /** How many experiences each Box has, by box id. */
+  onBox: Record<number, number>
+}
+
+/** From each Box's list of installed project ids (and the Boxes' ids, in the same order). */
+export function boxUsageFrom(perBox: string[][], boxIds: number[] = []): BoxUsage {
+  const boxesOf: Record<string, number> = {}
+  const onBox: Record<number, number> = {}
+  perBox.forEach((ids, i) => {
+    const unique = new Set(ids)
+    for (const id of unique) boxesOf[id] = (boxesOf[id] ?? 0) + 1
+    if (boxIds[i] !== undefined) onBox[boxIds[i]] = unique.size
+  })
+  return { boxesOf, idle: perBox.filter((ids) => ids.length === 0).length, onBox }
 }
 
 type Shared = keyof typeof fetchers
@@ -103,4 +134,11 @@ export const invalidate = {
   media: () => invalidateQueries('media'),
   /** A comment posted, replied to, resolved or reopened. */
   commentCounts: () => invalidateQueries('comment-counts'),
+  /** A save (the draft now differs from what was published) or a publish. */
+  publishStatus: () => invalidateQueries('publish-status'),
+}
+
+/** After a publish: the status the backend returned is the one every view should now show. */
+export function storePublishStatus(projectId: string, status: PublishStatusDto) {
+  setQueryData(keys.publishStatus(projectId), status)
 }
