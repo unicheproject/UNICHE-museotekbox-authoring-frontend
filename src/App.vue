@@ -6,6 +6,7 @@ import { Briefcase, LayoutGrid, Menu, Package, ScanLine, Users } from 'lucide-vu
 import { useAuthStore } from '@/stores/auth'
 import { useAuthzStore } from '@/stores/authz'
 import { useOrgNames } from '@/lib/useOrgNames'
+import { managesAnyOrg } from '@/platform/authz'
 import SidebarUser from '@/components/shell/SidebarUser.vue'
 
 const route = useRoute()
@@ -72,6 +73,9 @@ const navActive = 'bg-brand-deep/[0.08] font-bold text-brand-deep'
        hands it the whole viewport rather than centring it in a padded box. -->
   <RouterView v-if="!authenticated" />
 
+  <!-- A bare page (a Box's display on a TV) draws the whole screen itself: no sidebar, no header. -->
+  <RouterView v-else-if="route.meta.bare" />
+
   <div v-else class="flex min-h-screen bg-background">
     <!-- Drawer backdrop: only ever visible below `lg`, where the sidebar overlays the content. -->
     <div
@@ -113,7 +117,8 @@ const navActive = 'bg-brand-deep/[0.08] font-bold text-brand-deep'
           <Package class="h-4 w-4" />
           Boxes
         </RouterLink>
-        <RouterLink to="/members" :class="[navItem, navIdle]" :active-class="navActive">
+        <!-- Only managers can read an organisation's members; nobody else gets a link to an error. -->
+        <RouterLink v-if="managesAnyOrg(context)" to="/members" :class="[navItem, navIdle]" :active-class="navActive">
           <Users class="h-4 w-4" />
           Members
         </RouterLink>

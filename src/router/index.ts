@@ -11,6 +11,7 @@ import Boxes from '@/views/Boxes.vue'
 import BoxDetail from '@/views/BoxDetail.vue'
 import MembersSection from '@/views/MembersSection.vue'
 import Account from '@/views/Account.vue'
+import Display from '@/views/Display.vue'
 
 // IMPORTANT: created via a factory, not at module load. createWebHistory() captures the current
 // URL at creation time; if the router were created while the post-login OIDC fragment
@@ -21,7 +22,8 @@ export function createAppRouter() {
     history: createWebHistory(),
     routes: [
       { path: '/login', name: 'login', component: Login, meta: { public: true } },
-      { path: '/', name: 'dashboard', component: Dashboard },
+      // wide like the Experiences list: it shows the same card grid.
+      { path: '/', name: 'dashboard', component: Dashboard, meta: { wide: true } },
       // wide: on a large monitor the list uses the whole width instead of the usual 1180px.
       { path: '/experiences', name: 'experiences', component: Experiences, meta: { wide: true } },
       // Must come before '/experiences/:projectId' so 'new' and 'deleted' are not captured as
@@ -42,16 +44,21 @@ export function createAppRouter() {
       { path: '/experiences/:projectId/advanced', name: 'experience-advanced', component: ExperienceDetail, meta: { wide: true } },
       // Scan objects and boxes are organisation-scoped on the backend, so the organisation is part
       // of the detail path: a shared or reopened link would otherwise not know where to look.
-      { path: '/scan-objects', name: 'scan-objects', component: ScanObjects },
+      { path: '/scan-objects', name: 'scan-objects', component: ScanObjects, meta: { wide: true } },
       {
         path: '/scan-objects/:orgId/:scanObjectId',
         name: 'scan-object',
         component: ScanObjectDetail,
+        meta: { wide: true },
       },
-      { path: '/boxes', name: 'boxes', component: Boxes },
-      { path: '/boxes/:orgId/:boxId', name: 'box', component: BoxDetail },
-      { path: '/members', name: 'members', component: MembersSection },
-      { path: '/account', name: 'account', component: Account },
+      { path: '/boxes', name: 'boxes', component: Boxes, meta: { wide: true } },
+      { path: '/boxes/:orgId/:boxId', name: 'box', component: BoxDetail, meta: { wide: true } },
+      // A Box's display: full screen on a TV, outside the app shell (meta `bare`). Opened in a new
+      // tab from the Box's page.
+      { path: '/display/:orgId/:boxId', name: 'display', component: Display, meta: { bare: true } },
+      // wide like the other lists; Account caps its own panels like a Box's page.
+      { path: '/members', name: 'members', component: MembersSection, meta: { wide: true } },
+      { path: '/account', name: 'account', component: Account, meta: { wide: true } },
     ],
   })
 
@@ -59,13 +66,22 @@ export function createAppRouter() {
   // user lands on our own /login screen rather than being thrown straight at the IdP — the jump to
   // Keycloak happens only when they press the button there. The route they were heading for is
   // carried in ?redirect so the login can send them back to it.
-  router.beforeEach((to) => {
+  router.beforeEach((to, from) => {
     const authStore = useAuthStore()
     if (to.meta.public) {
       return true
     }
     if (!authStore.authenticated) {
       return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
+    }
+    // Reached from the Dashboard's guide (`?guide=…`): moving around the same experience or Box
+    // keeps the mark, so its bar stays while you work there. Anywhere else it is dropped.
+    const guide = from.query.guide
+    const same =
+      (to.params.projectId && to.params.projectId === from.params.projectId) ||
+      (to.params.boxId && to.params.boxId === from.params.boxId && to.params.orgId === from.params.orgId)
+    if (guide && !to.query.guide && same) {
+      return { path: to.path, query: { ...to.query, guide }, hash: to.hash }
     }
     return true
   })
