@@ -35,7 +35,8 @@ const emit = defineEmits<{ close: [] }>()
 
 const router = useRouter()
 
-const tiles = [{ id: '', name: 'Decide later', icon: 'plus' }, ...TEMPLATES]
+// "Start from scratch" is left out here (it stays in Add an activity): "Decide later" covers it.
+const tiles = [{ id: '', name: 'Decide later', icon: 'plus' }, ...TEMPLATES.filter((t) => t.id !== 'scratch')]
 const steps = { name: 1, output: 2, first: 3 }
 
 /** Section numbers: quiet, so they don't read as the experience's own step numbers. */
