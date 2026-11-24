@@ -20,8 +20,8 @@ import { scanObjectFormErrors, type ScanObjectFormModel } from '@/lib/scanObject
  * a model reference, and a draft neither.
  *
  * The card type is picked from the organisation's types by name. A manager can make a new one
- * right here ("+ New type…", Plain / Universal / Exit): card types have no screen of their own, so
- * this is how a new organisation gets its first. The new type is chosen at once. `reusable` is not
+ * right here ("+ New type…", name only; it is created as a plain type): card types have no screen
+ * of their own, so this is how a new organisation gets its first. The new type is chosen at once. `reusable` is not
  * shown: the backend no longer uses it (the form model still carries it, so an edit keeps the
  * stored value).
  */
@@ -32,8 +32,6 @@ const props = defineProps<{
   fieldErrors?: Record<string, string>
   /** Editing cannot change kind: each kind has its own endpoint, with no move between them. */
   kindLocked?: boolean
-  /** Hidden while editing, where a dedicated dialog owns the tag. */
-  showRfid?: boolean
 }>()
 
 const form = defineModel<ScanObjectFormModel>({ required: true })
@@ -69,32 +67,20 @@ const typeOptions = computed<SelectOption[]>(() => {
 // ── + New type… (managers only; the backend re-checks) ──
 const { context } = storeToRefs(useAuthzStore())
 const canAddType = computed(() => canManageOrg(context.value, props.orgId))
-type TypeKind = 'plain' | 'universal' | 'exit'
-const TYPE_KINDS: { id: TypeKind; name: string; blurb: string }[] = [
-  { id: 'plain', name: 'Plain', blurb: 'Starts or answers where an experience uses it.' },
-  { id: 'universal', name: 'Universal', blurb: 'Works anywhere in any experience.' },
-  { id: 'exit', name: 'Exit', blurb: 'Ends the visit. One per organisation.' },
-]
-const hasExit = computed(() => (types.data.value ?? []).some((t) => t.exit))
 const addingType = ref(false)
 const typeName = ref('')
-const typeKind = ref<TypeKind>('plain')
 // The editor's own copy of the types (scan types) changes too, so both are refreshed.
 const createType = useMutation(createScanObjectType, { invalidates: ['card-types', 'scan-types'] })
 function startType() {
   typeName.value = ''
-  typeKind.value = 'plain'
   createType.reset()
   addingType.value = true
 }
 async function submitType() {
   const name = typeName.value.trim()
   if (!name) return
-  const outcome = await createType.mutate(props.orgId, {
-    name,
-    universal: typeKind.value === 'universal',
-    exit: typeKind.value === 'exit',
-  })
+  // Always a plain type; the request still carries both flags, as the API expects.
+  const outcome = await createType.mutate(props.orgId, { name, universal: false, exit: false })
   if (outcome.ok && outcome.data) {
     form.value.scanObjectTypeId = String(outcome.data.id)
     addingType.value = false
@@ -219,25 +205,8 @@ const selectField = (invalid: boolean) => [...field(invalid), 'cursor-pointer ap
           maxlength="255"
           @keydown.enter.prevent="submitType"
         />
-        <div class="grid gap-2">
-          <button
-            v-for="k in TYPE_KINDS"
-            :key="k.id"
-            type="button"
-            :aria-pressed="typeKind === k.id"
-            :disabled="k.id === 'exit' && hasExit"
-            class="flex flex-col items-start gap-0.5 rounded-lg border bg-white p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            :class="typeKind === k.id ? 'border-brand-deep bg-brand-deep/[.05]' : 'border-border hover:border-brand-deep/50'"
-            @click="typeKind = k.id"
-          >
-            <span class="text-[14px] font-extrabold" :class="{ 'text-brand-deep': typeKind === k.id }">{{ k.name }}</span>
-            <span class="text-[13px] text-secondary-foreground">
-              {{ k.id === 'exit' && hasExit ? 'This organisation already has an Exit type.' : k.blurb }}
-            </span>
-          </button>
-        </div>
         <p v-if="createType.error.value" role="alert" class="text-[13px] font-bold text-destructive">
-          {{ createType.fieldErrors.value.exit ?? createType.error.value }}
+          {{ createType.error.value }}
         </p>
         <div class="flex flex-wrap gap-2">
           <button type="button" :class="[btnDeep, '!py-2.5']" :disabled="!typeName.trim() || createType.loading.value" @click="submitType">
@@ -247,20 +216,5 @@ const selectField = (invalid: boolean) => [...field(invalid), 'cursor-pointer ap
         </div>
       </div>
     </div>
-
-    <FormField v-if="showRfid" label="RFID tag" :error="errors.rfidTag">
-      <template #default="{ id, invalid, describedBy }">
-        <input
-          :id="id"
-          v-model="form.rfidTag"
-          :class="[...field(invalid), 'font-mono']"
-          :aria-invalid="invalid || undefined"
-          :aria-describedby="describedBy"
-          placeholder="Leave empty for none"
-          autocomplete="off"
-          @blur="leave('rfidTag')"
-        />
-      </template>
-    </FormField>
   </div>
 </template>
