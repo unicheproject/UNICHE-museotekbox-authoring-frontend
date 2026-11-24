@@ -7,6 +7,7 @@ import { OUTPUTS, TEMPLATES, template, type OutputId } from '@/lib/authoring/eng
 import { createExperience } from '@/lib/authoring/useAuthoring'
 import { toneOf } from '@/lib/authoring/tone'
 import AIcon from '@/components/authoring/AIcon.vue'
+import { ACTIVITY_HINT } from '@/components/authoring/activityHints'
 import {
   bigInput as inputCls,
   btnDeep,
@@ -183,7 +184,10 @@ async function create() {
                 >
                   <AIcon :name="t.icon" cls="h-5 w-5" />
                 </span>
-                <span class="min-w-0 flex-1 text-[14px] font-extrabold" :class="{ 'text-brand-deep': first === t.id }">{{ t.name }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-[14px] font-extrabold" :class="{ 'text-brand-deep': first === t.id }">{{ t.name }}</span>
+                  <span class="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">{{ ACTIVITY_HINT[t.id] }}</span>
+                </span>
                 <span v-if="first === t.id" class="shrink-0 text-brand-deep"><AIcon name="check" cls="h-5 w-5" /></span>
               </button>
             </div>
