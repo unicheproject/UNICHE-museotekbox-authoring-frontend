@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { MonitorPlay, Package, ScanLine, Layers } from 'lucide-vue-next'
+import { LogIn } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
-import { Button } from '@/components/ui/button'
+import BoxScene from '@/components/login/BoxScene.vue'
 
 /**
  * The public face of museotekBox, and the way into it.
@@ -12,9 +12,6 @@ import { Button } from '@/components/ui/button'
  * already signed in to UNICHE lands past this screen entirely (the silent-SSO check below), and
  * everyone else is sent to the UNICHE Keycloak and returned here. That makes this page a landing
  * page with one action rather than a login form — there are no credentials to collect.
- *
- * The wording of the sections below is taken from the MuseotekBox specification rather than
- * written for the page.
  */
 const authStore = useAuthStore()
 const router = useRouter()
@@ -47,132 +44,137 @@ onMounted(() => {
     router.replace(redirectTo.value)
   }
 })
-
-const features = [
-  {
-    icon: Layers,
-    title: 'Experiences',
-    text: 'An interactive visitor journey composed of connected Scenes, arranged in sequence or through branching paths.',
-  },
-  {
-    icon: ScanLine,
-    title: 'Scan objects',
-    text: 'RFID-enabled cards, 3D-printed replicas and other physical items the Box recognises by their Scan Type.',
-  },
-  {
-    icon: Package,
-    title: 'Boxes',
-    text: 'A Raspberry Pi-based device with an RFID reader, a small LCD screen and speakers. Experiences publish to it over the air.',
-  },
-  {
-    icon: MonitorPlay,
-    title: 'Emulator',
-    text: 'Preview and test an Experience before publishing it to physical hardware, using the same Rule model it will run.',
-  },
-]
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-background">
-    <!-- The logo carries a black drop shadow, so the bar it sits in stays white. -->
-    <header
-      class="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur-sm"
-    >
-      <div class="mx-auto flex h-16 w-full max-w-[1180px] items-center gap-2.5 px-6">
-        <img src="/museotekbox_logo_no_background.png" alt="" class="h-9 w-9 object-contain" />
-        <span class="text-[17px] font-extrabold tracking-[0.02em] text-brand-deep">
-          Museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
-        </span>
-        <Button class="ml-auto" size="sm" :disabled="leaving" @click="signIn">
-          {{ leaving ? 'Signing in…' : 'Sign in' }}
-        </Button>
-      </div>
+  <div class="page relative flex min-h-screen flex-col overflow-hidden">
+    <!-- The flyer's circuit lines: two short groups that start at the page edge and end in a dot. -->
+    <svg class="lines left" viewBox="0 0 240 90" aria-hidden="true">
+      <path d="M0 20H120l24 24h60" /><circle cx="204" cy="44" r="3" />
+      <path d="M0 70H150" /><circle cx="150" cy="70" r="3" />
+    </svg>
+    <svg class="lines right" viewBox="0 0 240 90" aria-hidden="true">
+      <path d="M240 20H130l-24 24H46" /><circle cx="46" cy="44" r="3" />
+      <path d="M240 70H100" /><circle cx="100" cy="70" r="3" />
+    </svg>
+
+    <!-- One centred width for the logos, the text, the picture and the footer. -->
+    <!-- Platform │ tool, as the Portal's wordmark: one 1×24px line, #d1d5db, 12px either side. -->
+    <header class="wrap blend flex min-h-[3.75rem] items-center gap-3 min-[900px]:min-h-[4.5rem]">
+      <img
+        src="/uniche-logo-wordmark.jpg"
+        alt="UNICHE"
+        width="492"
+        height="96"
+        class="block h-5 w-auto mix-blend-multiply min-[900px]:h-[1.625rem]"
+      />
+      <span aria-hidden="true" class="h-6 w-px flex-none bg-[#d1d5db]" />
+      <img
+        src="/museotekbox-logo.svg"
+        alt="Museotek Box"
+        width="300"
+        height="55"
+        class="block h-6 w-auto min-[900px]:h-9"
+      />
     </header>
 
-    <main class="flex-1">
-      <!-- Hero: the styleguide's deep-violet band, with its soft decorative gradient (the lighter
-           #ff80b5 → #9089fc pair at low opacity), never the full brand gradient. -->
-      <section class="relative overflow-hidden bg-brand-deep">
-        <div
-          aria-hidden="true"
-          class="pointer-events-none absolute -right-40 -top-40 h-[560px] w-[560px] rounded-full bg-grad-deco opacity-40 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          class="pointer-events-none absolute -bottom-52 -left-40 h-[420px] w-[420px] rounded-full bg-grad-deco opacity-25 blur-3xl"
-        />
-
-        <div
-          class="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:py-24"
+    <main
+      class="wrap grid flex-1 grid-cols-1 items-center gap-8 pb-6 pt-4 min-[900px]:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] min-[900px]:gap-16 min-[900px]:pb-12 min-[900px]:pt-8"
+    >
+      <section>
+        <h1
+          class="text-[clamp(1.75rem,1.4rem+1vw,2.25rem)] font-bold leading-[1.2] tracking-[-0.02em] text-foreground"
         >
-          <div>
-            <h1
-              class="text-[38px] font-extrabold leading-[1.08] tracking-[-0.025em] text-white sm:text-[46px]"
-            >
-              Interactive experiences for museums and cultural institutions.
-            </h1>
+          Sign in to Museotek Box
+        </h1>
+        <p class="mb-8 mt-3.5 max-w-[26rem] text-base leading-relaxed text-[#374151]">
+          Create the experiences your Boxes play: steps, quizzes, sound and video, started by the
+          cards and objects visitors scan.
+        </p>
 
-            <p class="mt-6 max-w-[560px] text-base leading-relaxed text-white/70">
-              museotekBox connects physical objects and interactions with digital multimedia
-              content, so organisations can create, test and publish visitor experiences to their
-              own hardware.
-            </p>
-
-            <div class="mt-10">
-              <Button variant="gradient" size="lg" :disabled="leaving" @click="signIn">
-                {{ leaving ? 'Signing in…' : 'Sign in' }}
-              </Button>
-            </div>
-          </div>
-
-          <!-- The mark sits on its own white panel: its drop shadow is solid black and would read
-               as a smudge directly on the violet. -->
-          <div class="hidden lg:flex lg:justify-end">
-            <div
-              class="flex h-[340px] w-[340px] items-center justify-center rounded-[28px] bg-white shadow-lg"
-            >
-              <img
-                src="/museotekbox_logo_no_background.png"
-                alt=""
-                class="h-[200px] w-[200px] object-contain"
-              />
-            </div>
-          </div>
-        </div>
+        <!-- The app's main button ("New experience"): `.btn-grad`, extrabold capitals. -->
+        <button
+          type="button"
+          class="sign-in btn-grad inline-flex min-h-12 w-full items-center justify-center gap-2.5 px-7 text-[13px] font-extrabold uppercase tracking-button shadow-md transition-[transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:shadow-cta-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-brand-deep disabled:cursor-progress disabled:hover:translate-y-0 min-[900px]:max-w-[22rem]"
+          :disabled="leaving"
+          :aria-busy="leaving"
+          @click="signIn"
+        >
+          <LogIn class="h-[1.1rem] w-[1.1rem]" aria-hidden="true" />
+          {{ leaving ? 'Signing in…' : 'Sign in' }}
+        </button>
+        <p class="mt-3 text-[13px] text-[#5b6472]">with your UNICHE account</p>
       </section>
 
-      <section class="mx-auto w-full max-w-[1180px] px-6 py-20">
-        <h2 class="max-w-[680px] text-[26px] font-extrabold tracking-[-0.02em] text-foreground">
-          A web-based CMS, a server, one or more physical Boxes, and an optional external Display.
-        </h2>
-
-        <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <article
-            v-for="feature in features"
-            :key="feature.title"
-            class="rounded-lg border border-border bg-card p-6 shadow-xs transition-shadow hover:shadow-md"
-          >
-            <span
-              class="mb-5 flex h-11 w-11 items-center justify-center rounded-md bg-brand-deep/[0.08] text-brand-deep"
-            >
-              <component :is="feature.icon" class="h-5 w-5" />
-            </span>
-            <h2 class="text-base font-bold text-foreground">{{ feature.title }}</h2>
-            <p class="mt-2 text-[13px] leading-relaxed text-muted-foreground">{{ feature.text }}</p>
-          </article>
-        </div>
-      </section>
+      <BoxScene />
     </main>
 
-    <footer class="bg-surface-dark">
-      <div
-        class="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4 px-6 py-8"
-      >
-        <span class="text-[15px] font-extrabold tracking-[0.02em] text-white">
-          Museotek<span class="bg-grad-brand bg-clip-text text-transparent">Box</span>
-        </span>
-        <span class="text-xs text-white/45">A UNICHE platform tool</span>
-      </div>
+    <footer class="wrap pb-6 pt-5 text-xs text-[#5b6472]">
+      A tool of the UNICHE platform · created by Museotek
     </footer>
   </div>
 </template>
+
+<style scoped>
+.page {
+  background: linear-gradient(180deg, #f1f6f6 0%, #f7f8f8 55%, #faf4f7 100%);
+}
+.wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+@media (min-width: 900px) {
+  .wrap {
+    padding-inline: 2rem;
+  }
+}
+/* No stacking context on the header, so the UNICHE JPEG's white ground multiplies into the page's
+   tinted background instead of showing as a white box. */
+.wrap.blend {
+  z-index: auto;
+}
+
+.lines {
+  position: absolute;
+  z-index: 0;
+  width: 9rem;
+  pointer-events: none;
+}
+.lines path {
+  fill: none;
+  stroke: #dbe5e7;
+  stroke-width: 1.2;
+}
+.lines circle {
+  fill: #dbe5e7;
+}
+.lines.left {
+  left: 0;
+  bottom: 4rem;
+}
+.lines.right {
+  right: 0;
+  top: 4.5rem;
+}
+@media (min-width: 900px) {
+  .lines {
+    width: 15rem;
+  }
+  .lines.left {
+    bottom: 9rem;
+  }
+  .lines.right {
+    top: 7rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sign-in {
+    transition: none;
+  }
+}
+</style>
