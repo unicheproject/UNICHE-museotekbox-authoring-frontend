@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, Film, MessageCircle, Volume2 } from 'lucide-vue-next'
+import { ArrowRight, Film, ImageIcon, Layers, MessageCircle, Volume2 } from 'lucide-vue-next'
 import type { ProjectDto } from '@/api/museotekBox'
 import type { PublishLabel } from '@/lib/publish'
 import { OUTPUTS, template, type ScanType } from '@/lib/authoring/engine'
@@ -10,7 +10,8 @@ import { summarize } from '@/lib/authoring/useAuthoring'
 import { relTime } from '@/lib/authoring/useComments'
 import { useShared } from '@/lib/queries'
 import { useVisible } from '@/lib/useVisible'
-import { cardBox, cardOpen, coverFallback } from './styles'
+import { useAuthzStore } from '@/stores/authz'
+import { cardBox, cardOpen } from './styles'
 import AIcon from '@/components/authoring/AIcon.vue'
 import ExperienceBadges from './ExperienceBadges.vue'
 
@@ -47,6 +48,20 @@ const output = computed(() => (summary.value ? OUTPUTS[summary.value.output] : n
 const activities = computed(() => summary.value?.templates.length ?? 0)
 /** Each kind of activity once, in the order it first appears: nine activities are not nine icons. */
 const kinds = computed(() => Array.from(new Set(summary.value?.templates ?? [])))
+
+/**
+ * What the cover says when there is no picture to show: nothing while the experience is still
+ * being read, "No steps yet" for an empty one (with a pointer to open it, for someone who may edit
+ * it), and "No picture yet" for one whose steps have no picture. Never a coloured block that looks
+ * like a picture that did not load.
+ */
+const authz = useAuthzStore()
+const canEdit = computed(() => authz.can('experience.edit', { orgId: props.project.orgId, projectId: props.project.id }))
+const coverNote = computed(() => {
+  if (picture.value || !summary.value) return null
+  if (activities.value === 0) return { icon: Layers, text: 'No steps yet', hint: canEdit.value ? 'Open to add the first one' : null }
+  return { icon: ImageIcon, text: 'No picture yet', hint: null }
+})
 </script>
 
 <template>
@@ -55,12 +70,20 @@ const kinds = computed(() => Array.from(new Set(summary.value?.templates ?? []))
     :to="`/experiences/${project.id}`"
     :class="['group flex flex-col overflow-hidden', cardBox]"
   >
-    <!-- The picture fills the whole width of the card at 16:9, so its height follows the width. -->
-    <span
-      class="relative block aspect-video overflow-hidden"
-      :class="picture ? 'bg-surface-2' : coverFallback"
-    >
+    <!-- The picture fills the whole width of the card at 16:9, so its height follows the width. With
+         no picture, the same 16:9 band in the app's light grey says what is missing. -->
+    <span class="relative block aspect-video overflow-hidden border-b border-border bg-surface-2">
       <img v-if="picture" :src="picture" alt="" class="h-full w-full object-cover" />
+      <span
+        v-else-if="coverNote"
+        class="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground"
+      >
+        <component :is="coverNote.icon" class="h-7 w-7" aria-hidden="true" />
+        <span class="text-[12.5px] leading-snug">
+          <span class="font-semibold text-secondary-foreground">{{ coverNote.text }}</span>
+          <template v-if="coverNote.hint"> · {{ coverNote.hint }}</template>
+        </span>
+      </span>
       <!-- The kinds of activity in it, on the picture's corner. -->
       <span v-if="kinds.length" class="absolute bottom-2 left-2 flex gap-1">
         <span
@@ -94,8 +117,13 @@ const kinds = computed(() => Array.from(new Set(summary.value?.templates ?? []))
         {{ output.name }}
       </span>
 
+      <!-- Pushes the footer to the bottom: cards in a row are as tall as the tallest (grid stretch),
+           so the footers line up whatever lines (comments, output) a card has above. -->
       <span class="flex-1" />
-      <span class="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+      <!-- A fixed 24px row, the height of a status chip, so a card without a chip ("1 to fix") keeps
+           its divider and "Open" on the same line as its neighbours. Content-box, so the 24px is
+           the row itself, not counting the padding and border above it. -->
+      <span class="mt-4 box-content flex min-h-6 items-center justify-between gap-2 border-t border-border pt-3">
         <ExperienceBadges :publish="publish" :boxes="boxes" :missing="summary?.missing" :status="project.status" />
         <span :class="cardOpen">
           Open<ArrowRight class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />

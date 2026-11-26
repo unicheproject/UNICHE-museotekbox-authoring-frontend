@@ -7,11 +7,11 @@
 /** The card grid. Past laptop size the page is not capped (route meta `wide`), so it adds columns. */
 export const cardGrid = 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4 min-[2300px]:grid-cols-5'
 
-/** The header buttons: squared-off, uppercase. */
+/** The header buttons, uppercase. The gradient one is the styleguide's pill (`.btn-grad`, globals.css). */
 export const headBtnOutline =
   'inline-flex items-center justify-center gap-2 rounded-md border border-input bg-white px-3.5 py-2 text-[11.5px] font-extrabold uppercase tracking-button text-secondary-foreground hover:border-brand-deep hover:text-brand-deep'
 export const headBtnGrad =
-  'inline-flex items-center justify-center gap-2 rounded-md bg-grad-brand px-3.5 py-2 text-[11.5px] font-extrabold uppercase tracking-button text-white shadow-md transition-transform hover:-translate-y-0.5'
+  'btn-grad inline-flex items-center justify-center gap-2 px-3.5 py-2 text-[11.5px] font-extrabold uppercase tracking-button shadow-md transition-transform hover:-translate-y-0.5'
 
 /** The white box of an experience card, with its hover; for anything that should sit beside the cards. */
 export const cardBox =
@@ -35,7 +35,11 @@ export const pillTone = {
 /** The selected state of an outline button (moved unchanged from ExperienceHeader). */
 export const outlineOn = 'border-brand-deep text-brand-deep bg-brand-deep/[.04]'
 
-/** The cover of a card with no picture (the experience card's own fallback). */
+/**
+ * The brand-gradient band of an inventory card with no colour of its own, when not `compact`. No
+ * screen draws that today (Boxes and Scan objects pass `compact`, a soft tint); the experience card
+ * no longer uses it for a missing picture.
+ */
 export const coverFallback = 'bg-gradient-to-br from-brand-deep to-[#7b3fb8]'
 
 /** The "Open →" at the foot of a card. */

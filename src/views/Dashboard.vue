@@ -20,6 +20,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import ExperienceCard from '@/components/experience/ExperienceCard.vue'
 import { cardBox, cardGrid, headBtnGrad, headBtnOutline } from '@/components/experience/styles'
 import GetStarted from '@/components/experience/GetStarted.vue'
+import CreateExperienceDialog from '@/components/experience/CreateExperienceDialog.vue'
 import ListHeader from '@/components/inventory/ListHeader.vue'
 
 /**
@@ -55,6 +56,13 @@ const guideOrgId = computed(() => context.value?.managedOrganisations[0] ?? null
 const guideShown = ref(false)
 /** No experience at all yet (loaded, not failed): the recent list gives way to a welcome. */
 const noExperiences = computed(() => !pending.value && !error.value && experiences.value.length === 0)
+/**
+ * A new user: may create experiences and has none yet. They see only the welcome header and one
+ * card that creates the first experience; with that experience the usual dashboard returns.
+ */
+const newUser = computed(() => canCreate.value && noExperiences.value)
+/** The "Create an experience" dialog of the new user's card, in the first organisation they manage. */
+const creating = ref(false)
 /** For someone who can't create: what to expect, with nothing to press. */
 const welcomeText = computed(() =>
   orgIds.value.length
@@ -141,7 +149,7 @@ onMounted(async () => {
   <div>
     <!-- The same header as the Experiences screen. -->
     <ListHeader :title="displayName ? `Welcome, ${displayName}` : 'Welcome'" :subtitle="orgIds.length ? subtitle : undefined">
-      <template v-if="canCreate && !guideShown" #actions>
+      <template v-if="canCreate && !guideShown && !newUser" #actions>
         <RouterLink to="/experiences/new" :class="headBtnGrad">
           <Plus class="h-4 w-4" />
           New experience
@@ -149,6 +157,24 @@ onMounted(async () => {
       </template>
     </ListHeader>
 
+    <!-- A new user: one card, one button, nothing else. -->
+    <section v-if="newUser" class="rounded-lg bg-white px-5 py-6 shadow-xs sm:px-6" aria-labelledby="first-experience">
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-4">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-deep/[.07] text-brand-deep" aria-hidden="true">
+          <Briefcase class="h-5 w-5" />
+        </span>
+        <div class="min-w-0 flex-1 basis-60">
+          <h2 id="first-experience" class="text-[16px] font-extrabold">Create your first experience</h2>
+          <p class="text-[13.5px] text-muted-foreground">
+            An experience is what visitors see and hear at the Box: the screens, videos and questions that play as they place objects.
+          </p>
+        </div>
+        <button type="button" :class="headBtnGrad" @click="creating = true">Create an experience</button>
+      </div>
+      <CreateExperienceDialog v-if="creating && guideOrgId" :org-id="guideOrgId" @close="creating = false" />
+    </section>
+
+    <template v-else>
     <!-- Only for a new organisation (lib/guide.ts): a manager's steps, one at a time, until hidden. -->
     <GetStarted v-if="guideOrgId" :org-id="guideOrgId" @visible="guideShown = $event" @changed="recount" />
 
@@ -253,5 +279,6 @@ onMounted(async () => {
         :publish="publishLabel(statuses[exp.id])"
       />
     </div>
+    </template>
   </div>
 </template>

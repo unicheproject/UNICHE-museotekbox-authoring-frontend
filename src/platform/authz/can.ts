@@ -35,7 +35,7 @@ export function canManageOrg(ctx: AuthorizationContext | null | undefined, orgId
 
 /**
  * Whether the caller manages anything: a platform admin, or a manager of at least one
- * organisation. For what only managers see at all (the Members screen in the sidebar, the
+ * organisation. For what only managers see at all (the Members link in the menu, the
  * Dashboard's members count and idle Boxes). UX gating only.
  */
 export function managesAnyOrg(ctx: AuthorizationContext | null | undefined): boolean {

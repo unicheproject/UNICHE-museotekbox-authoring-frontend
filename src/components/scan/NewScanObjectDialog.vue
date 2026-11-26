@@ -43,6 +43,6 @@ async function submit() {
     :submit-disabled="!scanObjectFormComplete(form)"
     @submit="submit"
   >
-    <ScanObjectFormFields v-model="form" :org-id="orgId" :field-errors="create.fieldErrors.value" show-rfid />
+    <ScanObjectFormFields v-model="form" :org-id="orgId" :field-errors="create.fieldErrors.value" />
   </FormShell>
 </template>

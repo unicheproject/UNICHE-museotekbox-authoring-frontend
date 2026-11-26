@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { TEMPLATES } from '@/lib/authoring/engine'
+import { ACTIVITY_HINT } from './activityHints'
 import AIcon from './AIcon.vue'
 import { toneOf } from '@/lib/authoring/tone'
 import { dialogBody, dialogBox, dialogClose, dialogHead, dialogSub, dialogTitle, overlay } from './ui/styles'
@@ -44,7 +45,7 @@ const sub = computed(() =>
             </span>
             <span>
               <span class="block text-[14px] font-extrabold">{{ t.name }}</span>
-              <span class="mt-0.5 block text-[13px] leading-snug text-muted-foreground">{{ t.blurb }}</span>
+              <span class="mt-0.5 block text-[13px] leading-snug text-muted-foreground">{{ ACTIVITY_HINT[t.id] }}</span>
             </span>
           </button>
         </div>

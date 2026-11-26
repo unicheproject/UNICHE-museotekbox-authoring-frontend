@@ -6,7 +6,7 @@ export const btnOutline =
 export const btnDeep =
   'inline-flex items-center justify-center gap-2 rounded-md bg-brand-deep px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button text-white hover:bg-brand-deep/90 disabled:cursor-not-allowed disabled:opacity-40'
 export const btnGrad =
-  'inline-flex items-center justify-center gap-2 rounded-md bg-grad-brand px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button text-white shadow-md transition-transform hover:-translate-y-0.5'
+  'btn-grad inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-button shadow-md transition-transform hover:-translate-y-0.5 disabled:hover:translate-y-0'
 /** A dashed "add" button, full width. */
 export const addBtn =
   'flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-brand-deep/30 py-4 text-[14px] font-extrabold text-brand-deep hover:border-brand-deep hover:bg-brand-deep/[.03]'
