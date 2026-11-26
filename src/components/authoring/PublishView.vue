@@ -324,7 +324,7 @@ async function publish() {
       <button
         type="button"
         :disabled="!ready"
-        :class="[btnGrad, '!rounded-md !px-8 !py-4 !text-[13.5px] disabled:cursor-not-allowed disabled:bg-none disabled:bg-input disabled:shadow-none disabled:hover:translate-y-0']"
+        :class="[btnGrad, '!px-8 !py-4 !text-[13.5px]']"
         @click="publish"
       >
         {{ publishing ? 'Publishing…' : 'Publish' }}

@@ -67,7 +67,7 @@ onUnmounted(() => window.clearTimeout(cursorTimer))
           <div class="dsp-message-icon"><Unplug aria-hidden="true" /></div>
           <h1>This display is no longer connected</h1>
           <p>Sign in again to bring it back.</p>
-          <button type="button" class="dsp-btn" @click="$emit('sign-in')">Sign in again</button>
+          <button type="button" class="dsp-btn btn-grad" @click="$emit('sign-in')">Sign in again</button>
         </div>
       </main>
 
