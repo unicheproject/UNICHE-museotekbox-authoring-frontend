@@ -17,7 +17,7 @@ import MoreSettings from '@/components/authoring/ui/MoreSettings.vue'
 /**
  * Account and authorization detail. This lived on the dashboard while proving out authentication
  * in v1, but a home screen is the most expensive space in the app and belongs to the user's work,
- * not to their credentials — so it moved here, reachable from the sidebar's user block.
+ * not to their credentials — so it moved here, reachable from the header's user menu.
  */
 const authStore = useAuthStore()
 const authzStore = useAuthzStore()
