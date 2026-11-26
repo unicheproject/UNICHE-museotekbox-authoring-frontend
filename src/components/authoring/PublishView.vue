@@ -227,7 +227,7 @@ async function publish() {
 
     <Alert v-if="error" variant="error" class="mb-4">{{ error }}</Alert>
     <Alert v-if="saveError" variant="error" class="mb-4" title="The last change was not saved">{{ saveError }}</Alert>
-    <Alert v-if="serverGaps.length" variant="error" class="mb-4" title="The server found things still missing:">
+    <Alert v-if="serverGaps.length" variant="error" class="mb-4" title="The server found things to fix:">
       <ul class="mt-1 list-disc space-y-0.5 pl-5">
         <li v-for="(g, i) in serverGaps" :key="i">{{ g }}</li>
       </ul>
@@ -253,7 +253,7 @@ async function publish() {
             </component>
           </li>
         </ul>
-        <div v-else class="flex items-center gap-3 text-[14px] font-bold text-success"><AIcon name="checkc" cls="h-6 w-6" />Nothing is missing</div>
+        <div v-else class="flex items-center gap-3 text-[14px] font-bold text-success"><AIcon name="checkc" cls="h-6 w-6" />Nothing to fix</div>
       </QCard>
 
       <QCard :n="2" title="Published version">

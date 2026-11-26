@@ -49,8 +49,8 @@ const unusual = computed(() => {
       <MessageCircle class="h-3 w-3" />{{ comments }}
     </span>
 
-    <span v-if="missing" :class="[pill, pillTone.warning]">
-      <AlertTriangle class="h-3 w-3" />{{ missing }} missing
+    <span v-if="missing" :class="[pill, pillTone.warning]" title="Things to fix before publishing">
+      <AlertTriangle class="h-3 w-3" />{{ missing }} to fix
     </span>
   </span>
 </template>
