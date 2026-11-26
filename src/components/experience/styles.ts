@@ -35,7 +35,11 @@ export const pillTone = {
 /** The selected state of an outline button (moved unchanged from ExperienceHeader). */
 export const outlineOn = 'border-brand-deep text-brand-deep bg-brand-deep/[.04]'
 
-/** The cover of a card with no picture (the experience card's own fallback). */
+/**
+ * The brand-gradient band of an inventory card with no colour of its own, when not `compact`. No
+ * screen draws that today (Boxes and Scan objects pass `compact`, a soft tint); the experience card
+ * no longer uses it for a missing picture.
+ */
 export const coverFallback = 'bg-gradient-to-br from-brand-deep to-[#7b3fb8]'
 
 /** The "Open →" at the foot of a card. */
